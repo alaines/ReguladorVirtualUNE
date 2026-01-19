@@ -93,7 +93,7 @@ ESTILOS_GRUPOS = {
 class CentralGUI:
     """Interfaz gráfica principal de la Central"""
     
-    VERSION = "1.1.0"
+    VERSION = "1.2.0"
     
     def __init__(self, root):
         self.root = root
@@ -341,6 +341,9 @@ class CentralGUI:
         
         # Panel de estado en tiempo real
         self._crear_panel_estado(content_frame)
+        
+        # Panel de planes y fases
+        self._crear_panel_planes(content_frame)
         
         # Panel de comandos
         self._crear_panel_comandos(content_frame)
@@ -614,6 +617,304 @@ class CentralGUI:
             sem['label'].config(text='⚡', fg=colores_on['ambar'])
         else:
             sem['label'].config(text=estado[:2] if estado else '--', fg=COLORES['texto_dim'])
+
+    def _crear_panel_planes(self, parent):
+        """Crea el panel de planes y configuración del regulador"""
+        # Frame colapsable para planes
+        planes_frame = ttk.LabelFrame(parent, text="📋 PLANES Y CONFIGURACIÓN", style='Dark.TLabelframe')
+        planes_frame.pack(fill='x', pady=5)
+        
+        # Frame principal con dos columnas
+        main_planes = ttk.Frame(planes_frame, style='Panel.TFrame')
+        main_planes.pack(fill='x', padx=10, pady=5)
+        
+        # Columna izquierda: Lista de planes
+        left_frame = ttk.Frame(main_planes, style='Panel.TFrame')
+        left_frame.pack(side='left', fill='both', expand=True, padx=(0, 5))
+        
+        ttk.Label(left_frame, text="Planes:", style='Panel.TLabel').pack(anchor='w')
+        
+        # Listbox de planes
+        planes_list_frame = ttk.Frame(left_frame, style='Panel.TFrame')
+        planes_list_frame.pack(fill='both', expand=True)
+        
+        self.lista_planes = tk.Listbox(
+            planes_list_frame,
+            bg=COLORES['panel_claro'],
+            fg=COLORES['texto'],
+            font=('Consolas', 9),
+            height=6,
+            selectmode='single',
+            relief='flat',
+            highlightthickness=1,
+            highlightbackground=COLORES['borde']
+        )
+        self.lista_planes.pack(side='left', fill='both', expand=True)
+        self.lista_planes.bind('<<ListboxSelect>>', self._on_seleccionar_plan)
+        
+        scrollbar_planes = ttk.Scrollbar(planes_list_frame, orient='vertical', 
+                                          command=self.lista_planes.yview)
+        scrollbar_planes.pack(side='right', fill='y')
+        self.lista_planes.config(yscrollcommand=scrollbar_planes.set)
+        
+        # Columna derecha: Detalles del plan seleccionado
+        right_frame = ttk.Frame(main_planes, style='Panel.TFrame')
+        right_frame.pack(side='left', fill='both', expand=True, padx=(5, 0))
+        
+        ttk.Label(right_frame, text="Detalle del Plan:", style='Panel.TLabel').pack(anchor='w')
+        
+        # Grid de detalles
+        detail_grid = ttk.Frame(right_frame, style='Panel.TFrame')
+        detail_grid.pack(fill='x', pady=5)
+        
+        # Fila 1: ID y Nombre
+        ttk.Label(detail_grid, text="ID:", style='Panel.TLabel').grid(row=0, column=0, sticky='e', padx=3, pady=2)
+        self.lbl_plan_id = ttk.Label(detail_grid, text="--", style='Panel.TLabel')
+        self.lbl_plan_id.grid(row=0, column=1, sticky='w', padx=3, pady=2)
+        
+        ttk.Label(detail_grid, text="Nombre:", style='Panel.TLabel').grid(row=0, column=2, sticky='e', padx=3, pady=2)
+        self.lbl_plan_nombre = ttk.Label(detail_grid, text="--", style='Panel.TLabel')
+        self.lbl_plan_nombre.grid(row=0, column=3, sticky='w', padx=3, pady=2)
+        
+        # Fila 2: Ciclo y Desfase
+        ttk.Label(detail_grid, text="Ciclo:", style='Panel.TLabel').grid(row=1, column=0, sticky='e', padx=3, pady=2)
+        self.lbl_plan_ciclo = ttk.Label(detail_grid, text="--s", style='Panel.TLabel')
+        self.lbl_plan_ciclo.grid(row=1, column=1, sticky='w', padx=3, pady=2)
+        
+        ttk.Label(detail_grid, text="Desfase:", style='Panel.TLabel').grid(row=1, column=2, sticky='e', padx=3, pady=2)
+        self.lbl_plan_desfase = ttk.Label(detail_grid, text="--s", style='Panel.TLabel')
+        self.lbl_plan_desfase.grid(row=1, column=3, sticky='w', padx=3, pady=2)
+        
+        # Fila 3: Estructura y Horario
+        ttk.Label(detail_grid, text="Estructura:", style='Panel.TLabel').grid(row=2, column=0, sticky='e', padx=3, pady=2)
+        self.lbl_plan_estructura = ttk.Label(detail_grid, text="--", style='Panel.TLabel')
+        self.lbl_plan_estructura.grid(row=2, column=1, sticky='w', padx=3, pady=2)
+        
+        ttk.Label(detail_grid, text="Horario:", style='Panel.TLabel').grid(row=2, column=2, sticky='e', padx=3, pady=2)
+        self.lbl_plan_horario = ttk.Label(detail_grid, text="--", style='Panel.TLabel')
+        self.lbl_plan_horario.grid(row=2, column=3, sticky='w', padx=3, pady=2)
+        
+        # Fila 4: Duraciones de fases
+        ttk.Label(detail_grid, text="Fases:", style='Panel.TLabel').grid(row=3, column=0, sticky='e', padx=3, pady=2)
+        self.lbl_plan_fases = ttk.Label(detail_grid, text="--", style='Panel.TLabel')
+        self.lbl_plan_fases.grid(row=3, column=1, columnspan=3, sticky='w', padx=3, pady=2)
+        
+        # Fila 5: Transitorios
+        ttk.Label(detail_grid, text="Trans.:", style='Panel.TLabel').grid(row=4, column=0, sticky='e', padx=3, pady=2)
+        self.lbl_plan_trans = ttk.Label(detail_grid, text="Ámbar: --s, Rojo seg: --s", style='Panel.TLabel')
+        self.lbl_plan_trans.grid(row=4, column=1, columnspan=3, sticky='w', padx=3, pady=2)
+        
+        # Botones de acciones
+        btn_frame = ttk.Frame(planes_frame, style='Panel.TFrame')
+        btn_frame.pack(fill='x', padx=10, pady=5)
+        
+        tk.Button(btn_frame, text="📥 Cargar desde Archivo",
+                  bg=COLORES['acento'], fg=COLORES['texto'],
+                  font=('Segoe UI', 9), relief='flat',
+                  command=self._cargar_planes_archivo).pack(side='left', padx=3)
+        
+        tk.Button(btn_frame, text="📤 Exportar Planes",
+                  bg=COLORES['panel_claro'], fg=COLORES['texto'],
+                  font=('Segoe UI', 9), relief='flat',
+                  command=self._exportar_planes).pack(side='left', padx=3)
+        
+        tk.Button(btn_frame, text="🔄 Cargar de Regulador",
+                  bg=COLORES['exito'], fg=COLORES['texto'],
+                  font=('Segoe UI', 9), relief='flat',
+                  command=self._cargar_config_regulador).pack(side='left', padx=3)
+        
+        # Inicializar almacén de planes
+        self.planes_regulador = {}
+        self.plan_seleccionado = None
+    
+    def _on_seleccionar_plan(self, event=None):
+        """Maneja la selección de un plan en la lista"""
+        selection = self.lista_planes.curselection()
+        if not selection:
+            return
+        
+        idx = selection[0]
+        if not self.regulador_seleccionado:
+            return
+        
+        reg_id = self.regulador_seleccionado.id
+        if reg_id not in self.planes_regulador:
+            return
+        
+        planes = self.planes_regulador[reg_id].get('lista', [])
+        if idx < len(planes):
+            plan = planes[idx]
+            self.plan_seleccionado = plan
+            self._mostrar_detalle_plan(plan)
+    
+    def _mostrar_detalle_plan(self, plan: dict):
+        """Muestra los detalles de un plan"""
+        self.lbl_plan_id.config(text=str(plan.get('id', '--')))
+        self.lbl_plan_nombre.config(text=plan.get('nombre', '--'))
+        self.lbl_plan_ciclo.config(text=f"{plan.get('ciclo', '--')}s")
+        self.lbl_plan_desfase.config(text=f"{plan.get('desfase', 0)}s")
+        self.lbl_plan_estructura.config(text=f"Est. {plan.get('estructura_id', '--')}")
+        
+        # Horarios
+        horarios = plan.get('horarios', [])
+        if horarios:
+            h_str = ', '.join([h.get('inicio', '') for h in horarios])
+            self.lbl_plan_horario.config(text=h_str)
+        else:
+            self.lbl_plan_horario.config(text="--")
+        
+        # Duraciones de fases
+        duraciones = plan.get('duraciones_fases', {})
+        if duraciones:
+            fases_str = ', '.join([f"F{k}:{v}s" for k, v in duraciones.items()])
+            self.lbl_plan_fases.config(text=fases_str)
+        else:
+            self.lbl_plan_fases.config(text="--")
+        
+        # Transitorios
+        trans = plan.get('transitorios', {}).get('vehicular', {})
+        ambar = trans.get('tiempo_ambar', '--')
+        rojo = trans.get('tiempo_rojo_seguridad', '--')
+        self.lbl_plan_trans.config(text=f"Ámbar: {ambar}s, Rojo seg: {rojo}s")
+    
+    def _actualizar_lista_planes(self):
+        """Actualiza la lista de planes del regulador seleccionado"""
+        self.lista_planes.delete(0, tk.END)
+        
+        if not self.regulador_seleccionado:
+            return
+        
+        reg_id = self.regulador_seleccionado.id
+        if reg_id not in self.planes_regulador:
+            return
+        
+        planes = self.planes_regulador[reg_id].get('lista', [])
+        for plan in planes:
+            activo = "✓" if plan.get('activo', True) else " "
+            texto = f"[{activo}] {plan.get('id', '?'):3d} - {plan.get('nombre', 'Sin nombre')} ({plan.get('ciclo', 0)}s)"
+            self.lista_planes.insert(tk.END, texto)
+    
+    def _cargar_planes_archivo(self):
+        """Carga planes desde un archivo de configuración"""
+        from tkinter import filedialog
+        
+        archivo = filedialog.askopenfilename(
+            title="Cargar configuración de planes",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialdir=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        if not archivo:
+            return
+        
+        try:
+            with open(archivo, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            # Extraer planes
+            planes_data = config.get('planes', {})
+            if planes_data and self.regulador_seleccionado:
+                reg_id = self.regulador_seleccionado.id
+                self.planes_regulador[reg_id] = planes_data
+                self._actualizar_lista_planes()
+                
+                # Actualizar número de grupos si existe
+                grupos = config.get('grupos', {})
+                if grupos:
+                    num_grupos = grupos.get('cantidad', 4)
+                    self.regulador_seleccionado.num_grupos = num_grupos
+                    self.combo_num_grupos.set(str(num_grupos))
+                    self._crear_semaforos_grupos(num_grupos)
+                
+                self._log(f"Cargados {len(planes_data.get('lista', []))} planes desde {os.path.basename(archivo)}", "INFO")
+        except Exception as e:
+            self._log(f"Error al cargar archivo: {e}", "ERROR")
+            messagebox.showerror("Error", f"No se pudo cargar el archivo:\n{e}")
+    
+    def _exportar_planes(self):
+        """Exporta los planes del regulador a un archivo"""
+        from tkinter import filedialog
+        
+        if not self.regulador_seleccionado:
+            messagebox.showwarning("Aviso", "Seleccione un regulador primero")
+            return
+        
+        reg_id = self.regulador_seleccionado.id
+        if reg_id not in self.planes_regulador:
+            messagebox.showwarning("Aviso", "No hay planes cargados para este regulador")
+            return
+        
+        archivo = filedialog.asksaveasfilename(
+            title="Exportar planes",
+            filetypes=[("JSON files", "*.json")],
+            defaultextension=".json",
+            initialfile=f"planes_{self.regulador_seleccionado.nombre.replace(' ', '_')}.json"
+        )
+        
+        if not archivo:
+            return
+        
+        try:
+            export_data = {
+                'regulador': {
+                    'id': reg_id,
+                    'nombre': self.regulador_seleccionado.nombre
+                },
+                'planes': self.planes_regulador[reg_id]
+            }
+            
+            with open(archivo, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=4, ensure_ascii=False)
+            
+            self._log(f"Planes exportados a {os.path.basename(archivo)}", "INFO")
+        except Exception as e:
+            self._log(f"Error al exportar: {e}", "ERROR")
+    
+    def _cargar_config_regulador(self):
+        """Carga la configuración desde el regulador virtual local"""
+        # Ruta al archivo de configuración del regulador virtual
+        ruta_config = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'regulador', 'config', 'regulador_config.json'
+        )
+        
+        if not os.path.exists(ruta_config):
+            messagebox.showerror("Error", f"No se encontró el archivo de configuración:\n{ruta_config}")
+            return
+        
+        try:
+            with open(ruta_config, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            if not self.regulador_seleccionado:
+                messagebox.showwarning("Aviso", "Seleccione un regulador primero")
+                return
+            
+            reg_id = self.regulador_seleccionado.id
+            
+            # Cargar planes
+            planes_data = config.get('planes', {})
+            if planes_data:
+                self.planes_regulador[reg_id] = planes_data
+                self._actualizar_lista_planes()
+            
+            # Cargar configuración de grupos
+            grupos = config.get('grupos', {})
+            if grupos:
+                num_grupos = grupos.get('cantidad', 4)
+                self.regulador_seleccionado.num_grupos = num_grupos
+                self.combo_num_grupos.set(str(num_grupos))
+                self._crear_semaforos_grupos(num_grupos)
+            
+            # Actualizar nombre si queremos
+            reg_config = config.get('regulador', {})
+            
+            self._log(f"Configuración cargada desde regulador virtual: {len(planes_data.get('lista', []))} planes, {num_grupos} grupos", "INFO")
+            messagebox.showinfo("Éxito", f"Configuración cargada:\n- {len(planes_data.get('lista', []))} planes\n- {num_grupos} grupos")
+            
+        except Exception as e:
+            self._log(f"Error al cargar configuración: {e}", "ERROR")
+            messagebox.showerror("Error", f"Error al cargar configuración:\n{e}")
 
     def _crear_panel_comandos(self, parent):
         """Crea el panel de comandos"""

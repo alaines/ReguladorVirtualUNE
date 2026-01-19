@@ -2817,7 +2817,7 @@ class ReguladorVirtualGUI:
                 self._log(f"🔔 CÓDIGO 0xD4 DETECTADO (Estados) en Sub:{subregulador}")
                 self._procesar_cambio_modo(datos, subregulador)
             
-            elif codigo_decodificado == 0x5D:  # 0xDD decodificado → Código propietario Ecotrafix
+            elif codigo_decodificado == 0x5D:  # 0xDD decodificado → Código propietario
                 # El regulador real responde ACK + eco
                 # Ejemplo: C→R: 0280DDDD03 → R→C: 06 + 0280DDDD03
                 logger.info("→ Respondiendo código propietario (0xDD) - ACK + eco")
@@ -2843,7 +2843,7 @@ class ReguladorVirtualGUI:
         
         NOTA IMPORTANTE: Según la captura del regulador real, SIEMPRE envía byte 0x80
         (decodificado 0x00) independientemente del estado de representación o modo.
-        La central Ecotrafix no usa B3 para determinar el estado de luces.
+        La central no usa B3 para determinar el estado de luces.
         """
         MODOS_STR = {1: "LOCAL", 2: "ORDENADOR", 3: "MANUAL"}
         

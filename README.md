@@ -1,7 +1,6 @@
 # Regulador Virtual UNE 135401-4
 
 Simulador de regulador de tráfico compatible con el protocolo UNE 135401-4 (Modo A/B).
-Probado y validado con central **Ecotrafix**.
 
 **Versión actual: 1.11.0** | [Ver cambios](CHANGELOG.md)
 

@@ -18,7 +18,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - **Reporte de estado intermitente a la central (Estado de Luces):**
   - El mensaje 0x94 (Datos de tráfico) ahora reporta correctamente el estado de representación
   - Byte 1 = 0x01 cuando está en INTERMITENTE, 0x02 cuando está en COLORES
-  - La central Ecotrafix ahora muestra "INTERMITENTE" en el campo "Estado de Luces"
+  - La central ahora muestra "INTERMITENTE" en el campo "Estado de Luces"
   - Análisis de captura real: `028194818183809603` (INTERMIT) vs `028194828183809503` (COLORES)
 
 - **Mensaje B3 (modo control) siempre envía 0x00:**
@@ -48,7 +48,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ## [1.9.0] - 2026-01-19
 
 ### Añadido
-- **Soporte completo para forzar planes desde la central Ecotrafix:**
+- **Soporte completo para forzar planes desde la central:**
   - La central ahora puede cambiar el plan del regulador en modo ORDENADOR
   - Conversión automática de IDs de plan: Central (3,4,5...) ↔ Regulador (131,132,133...)
   - Respuestas ACK + eco para todos los comandos según protocolo real
@@ -67,7 +67,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - 0xB5 (Configuración): ACK + eco
   - 0xB6 (Tablas programación): ACK + eco
   - 0xB7 (Incompatibilidades): ACK + eco
-  - 0xDD (Código propietario Ecotrafix): ACK + eco
+  - 0xDD (Código propietario): ACK + eco
 
 - **Conversión de IDs de plan entre central y regulador:**
   - Recepción D1: plan_central + 128 = plan_interno (ej: 3 → 131)

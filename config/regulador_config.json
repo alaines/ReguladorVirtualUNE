@@ -63,7 +63,7 @@
     "planes": {
         "plan_activo": 129,
         "seleccion_automatica": true,
-        "comentario": "Los planes empiezan desde ID 129 para coincidir con central Ecotrafix. Plan 129='Plan 1', 130='Plan 2', etc.",
+        "comentario": "Los planes empiezan desde ID 129 para coincidir con centrales UNE. Plan 129='Plan 1', 130='Plan 2', etc.",
         "lista": [
             {
                 "id": 129,

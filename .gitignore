@@ -30,8 +30,10 @@ env/
 .vscode/
 
 # Logs de aplicación
+logs/
 regulador/logs/
 central/logs/
+*.log
 .idea/
 *.swp
 *.swo

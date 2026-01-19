@@ -13,14 +13,17 @@
     "reguladores": [
         {
             "id": 1,
-            "nombre": "Regulador Virtual Local",
+            "nombre": "Av. Amancaes - Av. El Sol",
             "tipo_conexion": "tcp",
-            "ip": "127.0.0.1",
-            "puerto": 5000,
+            "ip": "172.17.10.103",
+            "puerto": 19000,
             "puerto_com": "",
             "baudrate": 9600,
-            "subreguladores": [128, 129],
             "modo": "A",
+            "subreguladores": [
+                128,
+                129
+            ],
             "polling_intervalo_ms": 5000,
             "habilitado": true
         }

@@ -93,7 +93,7 @@ ESTILOS_GRUPOS = {
 class CentralGUI:
     """Interfaz gráfica principal de la Central"""
     
-    VERSION = "1.0.0"
+    VERSION = "1.1.0"
     
     def __init__(self, root):
         self.root = root
@@ -404,15 +404,23 @@ class CentralGUI:
         self.combo_modo.grid(row=4, column=1, columnspan=2, sticky='w', padx=5, pady=3)
         self.combo_modo.set('Modo A (Síncrono)')
         
+        # Número de grupos
+        ttk.Label(grid_frame, text="Grupos:", style='Panel.TLabel').grid(row=5, column=0, sticky='e', padx=5, pady=3)
+        self.combo_num_grupos = ttk.Combobox(grid_frame, style='Dark.TCombobox', width=5,
+                                          values=[str(i) for i in range(1, 17)])
+        self.combo_num_grupos.grid(row=5, column=1, sticky='w', padx=5, pady=3)
+        self.combo_num_grupos.set('4')
+        self.combo_num_grupos.bind('<<ComboboxSelected>>', self._on_cambio_num_grupos)
+        
         # Polling
-        ttk.Label(grid_frame, text="Polling (ms):", style='Panel.TLabel').grid(row=5, column=0, sticky='e', padx=5, pady=3)
+        ttk.Label(grid_frame, text="Polling (ms):", style='Panel.TLabel').grid(row=6, column=0, sticky='e', padx=5, pady=3)
         self.entry_polling = ttk.Entry(grid_frame, style='Dark.TEntry', width=8)
-        self.entry_polling.grid(row=5, column=1, sticky='w', padx=5, pady=3)
+        self.entry_polling.grid(row=6, column=1, sticky='w', padx=5, pady=3)
         self.entry_polling.insert(0, '5000')
         
         self.var_habilitado = tk.BooleanVar(value=True)
         ttk.Checkbutton(grid_frame, text="Habilitado", variable=self.var_habilitado,
-                        style='Dark.TCheckbutton').grid(row=5, column=2, sticky='w', padx=5)
+                        style='Dark.TCheckbutton').grid(row=6, column=2, sticky='w', padx=5)
         
         # Botones de configuración
         btn_config_frame = ttk.Frame(config_frame, style='Panel.TFrame')
@@ -474,26 +482,16 @@ class CentralGUI:
         self.lbl_seg_ciclo = ttk.Label(row2, text="Seg. Ciclo: --", style='Panel.TLabel')
         self.lbl_seg_ciclo.pack(side='left', padx=10)
         
-        # Grupos de semáforos
-        grupos_frame = ttk.Frame(estado_frame, style='Panel.TFrame')
-        grupos_frame.pack(fill='x', padx=10, pady=10)
+        # Frame contenedor para grupos de semáforos
+        self.grupos_container = ttk.Frame(estado_frame, style='Panel.TFrame')
+        self.grupos_container.pack(fill='x', padx=10, pady=10)
         
-        ttk.Label(grupos_frame, text="GRUPOS:", style='Panel.TLabel').pack(side='left', padx=5)
+        # Inicializar estructura de semáforos
+        self.semaforos_canvas = {}
+        self.num_grupos_actual = 8
         
-        self.labels_grupos = []
-        for i in range(8):
-            frame_grupo = tk.Frame(grupos_frame, bg=COLORES['panel'])
-            frame_grupo.pack(side='left', padx=5)
-            
-            lbl_luz = tk.Label(frame_grupo, text="⚫", font=('Segoe UI', 20),
-                               bg=COLORES['panel'], fg=COLORES['apagado'])
-            lbl_luz.pack()
-            
-            lbl_num = tk.Label(frame_grupo, text=f"G{i+1}", font=('Segoe UI', 8),
-                               bg=COLORES['panel'], fg=COLORES['texto_dim'])
-            lbl_num.pack()
-            
-            self.labels_grupos.append(lbl_luz)
+        # Crear grupos iniciales
+        self._crear_semaforos_grupos(8)
         
         # Alarmas
         alarmas_frame = ttk.Frame(estado_frame, style='Panel.TFrame')
@@ -510,6 +508,113 @@ class CentralGUI:
             lbl.pack(side='left', padx=10)
             self.alarmas_labels[key] = lbl
     
+    def _crear_semaforos_grupos(self, num_grupos: int):
+        """Crea los semáforos visuales para los grupos"""
+        # Limpiar semáforos existentes
+        for widget in self.grupos_container.winfo_children():
+            widget.destroy()
+        
+        self.semaforos_canvas = {}
+        self.num_grupos_actual = num_grupos
+        
+        # Título
+        ttk.Label(self.grupos_container, text="GRUPOS:", 
+                  style='Panel.TLabel').pack(side='left', padx=5)
+        
+        # Colores de semáforo
+        colores_off = {
+            'rojo': '#4a0000',
+            'ambar': '#4a4a00', 
+            'verde': '#004a00'
+        }
+        
+        for i in range(num_grupos):
+            frame_grupo = tk.Frame(self.grupos_container, bg=COLORES['panel'])
+            frame_grupo.pack(side='left', padx=3)
+            
+            # Número del grupo
+            lbl_num = tk.Label(frame_grupo, text=f"G{i+1}", font=('Segoe UI', 8, 'bold'),
+                               bg=COLORES['panel'], fg=COLORES['texto'])
+            lbl_num.pack()
+            
+            # Canvas para el semáforo vehicular (3 luces)
+            canvas = tk.Canvas(frame_grupo, width=30, height=70, bg='#333333',
+                               highlightthickness=1, highlightbackground='#555555')
+            canvas.pack(pady=2)
+            
+            # Crear las 3 luces (apagadas inicialmente)
+            luz_rojo = canvas.create_oval(5, 3, 25, 23, fill=colores_off['rojo'], outline='#222222')
+            luz_ambar = canvas.create_oval(5, 25, 25, 45, fill=colores_off['ambar'], outline='#222222')
+            luz_verde = canvas.create_oval(5, 47, 25, 67, fill=colores_off['verde'], outline='#222222')
+            
+            # Etiqueta de estado
+            lbl_estado = tk.Label(frame_grupo, text="--", font=('Segoe UI', 7),
+                                  bg=COLORES['panel'], fg=COLORES['texto_dim'])
+            lbl_estado.pack()
+            
+            self.semaforos_canvas[i] = {
+                'canvas': canvas,
+                'rojo': luz_rojo,
+                'ambar': luz_ambar,
+                'verde': luz_verde,
+                'label': lbl_estado
+            }
+    
+    def _on_cambio_num_grupos(self, event=None):
+        """Handler cuando cambia el número de grupos"""
+        try:
+            num_grupos = int(self.combo_num_grupos.get())
+            if num_grupos != self.num_grupos_actual:
+                self._crear_semaforos_grupos(num_grupos)
+                
+                # Actualizar regulador si hay uno seleccionado
+                if self.regulador_seleccionado:
+                    self.regulador_seleccionado.num_grupos = num_grupos
+        except ValueError:
+            pass
+    
+    def _actualizar_semaforo_grupo(self, grupo_idx: int, estado: str):
+        """Actualiza el color del semáforo de un grupo"""
+        if grupo_idx not in self.semaforos_canvas:
+            return
+        
+        sem = self.semaforos_canvas[grupo_idx]
+        canvas = sem['canvas']
+        
+        # Colores apagados
+        colores_off = {'rojo': '#4a0000', 'ambar': '#4a4a00', 'verde': '#004a00'}
+        # Colores encendidos
+        colores_on = {'rojo': '#ff0000', 'ambar': '#ffcc00', 'verde': '#00ff00'}
+        
+        # Resetear todos a apagado
+        canvas.itemconfig(sem['rojo'], fill=colores_off['rojo'])
+        canvas.itemconfig(sem['ambar'], fill=colores_off['ambar'])
+        canvas.itemconfig(sem['verde'], fill=colores_off['verde'])
+        
+        # Actualizar según estado
+        estado_upper = estado.upper() if estado else ''
+        
+        if estado_upper in ['ROJO', 'R', 'RED']:
+            canvas.itemconfig(sem['rojo'], fill=colores_on['rojo'])
+            sem['label'].config(text='R', fg=colores_on['rojo'])
+        elif estado_upper in ['AMBAR', 'A', 'AMBER', 'YELLOW']:
+            canvas.itemconfig(sem['ambar'], fill=colores_on['ambar'])
+            sem['label'].config(text='A', fg=colores_on['ambar'])
+        elif estado_upper in ['VERDE', 'V', 'GREEN', 'G']:
+            canvas.itemconfig(sem['verde'], fill=colores_on['verde'])
+            sem['label'].config(text='V', fg=colores_on['verde'])
+        elif estado_upper in ['ROJO_AMBAR', 'RA', 'RED_AMBER']:
+            canvas.itemconfig(sem['rojo'], fill=colores_on['rojo'])
+            canvas.itemconfig(sem['ambar'], fill=colores_on['ambar'])
+            sem['label'].config(text='RA', fg=colores_on['ambar'])
+        elif estado_upper in ['APAGADO', 'OFF', '-', '']:
+            sem['label'].config(text='--', fg=COLORES['texto_dim'])
+        elif estado_upper in ['INTERMITENTE', 'FLASH', 'F']:
+            canvas.itemconfig(sem['ambar'], fill=colores_on['ambar'])
+            sem['label'].config(text='⚡', fg=colores_on['ambar'])
+        else:
+            sem['label'].config(text=estado[:2] if estado else '--', fg=COLORES['texto_dim'])
+
     def _crear_panel_comandos(self, parent):
         """Crea el panel de comandos"""
         # Frame contenedor con dos columnas
@@ -712,6 +817,12 @@ class CentralGUI:
         modo_texto = 'Modo A (Síncrono)' if reg.modo == 'A' else 'Modo B (Asíncrono)'
         self.combo_modo.set(modo_texto)
         
+        # Número de grupos
+        num_grupos = getattr(reg, 'num_grupos', 8)
+        self.combo_num_grupos.set(str(num_grupos))
+        if num_grupos != self.num_grupos_actual:
+            self._crear_semaforos_grupos(num_grupos)
+        
         self.entry_polling.delete(0, tk.END)
         self.entry_polling.insert(0, str(reg.polling_intervalo_ms))
         
@@ -736,14 +847,13 @@ class CentralGUI:
         self.lbl_hora.config(text=f"Hora: {reg.hora_formateada}")
         self.lbl_seg_ciclo.config(text=f"Seg. Ciclo: {reg.segundos_ciclo}")
         
-        # Grupos
-        for i, lbl in enumerate(self.labels_grupos):
+        # Actualizar semáforos de grupos
+        for i in range(self.num_grupos_actual):
             if i < len(reg.grupos):
-                estado = reg.grupos[i].estado
-                color, emoji = ESTILOS_GRUPOS.get(estado, ('#333333', '⚫'))
-                lbl.config(text=emoji, fg=color)
+                estado = reg.grupos[i].estado if hasattr(reg.grupos[i], 'estado') else str(reg.grupos[i])
+                self._actualizar_semaforo_grupo(i, estado)
             else:
-                lbl.config(text='⚫', fg=COLORES['apagado'])
+                self._actualizar_semaforo_grupo(i, 'APAGADO')
     
     def _agregar_regulador(self):
         """Agrega un nuevo regulador"""
@@ -797,6 +907,11 @@ class CentralGUI:
             reg.baudrate = 9600
         
         reg.modo = 'A' if 'A' in self.combo_modo.get() else 'B'
+        
+        try:
+            reg.num_grupos = int(self.combo_num_grupos.get())
+        except:
+            reg.num_grupos = 8
         
         try:
             reg.polling_intervalo_ms = int(self.entry_polling.get())

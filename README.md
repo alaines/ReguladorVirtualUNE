@@ -1,92 +1,180 @@
-# Regulador Virtual UNE 135401-4
+# 🚦 Regulador Virtual UNE & Central Virtual
 
-Simulador de regulador de tráfico compatible con el protocolo UNE 135401-4 (Modo A/B).
+Suite de herramientas para simulación y gestión de reguladores de tráfico compatibles con el protocolo **UNE 135401-4** (Modo A/B).
 
-**Versión actual: 1.11.0** | [Ver cambios](CHANGELOG.md)
+**Versión Regulador: 1.11.0** | **Versión Central: 1.0.0** | [Ver cambios](CHANGELOG.md)
+
+---
 
 ## 📁 Estructura del Proyecto
 
 ```
-probrarReguladorUNE/
-├── regulador_gui.py          # 🎯 ARCHIVO PRINCIPAL - GUI del regulador
-├── modules/                   # Módulos del sistema
-│   ├── estado_regulador.py   # Estado y lógica del regulador
-│   ├── generador_respuestas.py # Generación de mensajes UNE
-│   └── protocolo_une.py      # Constantes y funciones del protocolo
-├── config/                    # Configuración
-│   └── regulador_config.json # Configuración del regulador (planes, grupos, etc.)
-├── docs/                      # Documentación
-│   └── UNE_extraido.txt      # Extracto de la norma UNE 135401-4
-├── logs/                      # Logs de ejecución
-├── tools/                     # Herramientas auxiliares
-│   ├── ProxySnifferUNE.py    # Sniffer de tráfico UNE
-│   ├── analizar_b9.py        # Analizador de mensajes B9
-│   └── analizar_log.py       # Analizador de logs
-├── tests/                     # Tests
-│   └── test_plan.py
-└── legacy/                    # Código obsoleto (no usar)
+ReguladorVirtualUNE/
+│
+├── regulador/                    # 🚦 Regulador Virtual
+│   ├── regulador_gui.py         # GUI principal del regulador
+│   ├── modules/
+│   │   ├── estado_regulador.py
+│   │   ├── generador_respuestas.py
+│   │   └── protocolo_une.py
+│   ├── config/
+│   │   └── regulador_config.json
+│   └── logs/
+│
+├── central/                      # 🖥️ Central Virtual
+│   ├── central_gui.py           # GUI principal de la central
+│   ├── modules/
+│   │   ├── conexion_manager.py   # Gestión TCP/Serial
+│   │   ├── protocolo_central.py  # Comandos UNE
+│   │   ├── decodificador.py      # Parseo de respuestas
+│   │   └── estado_reguladores.py # Estado de reguladores
+│   ├── config/
+│   │   └── central_config.json
+│   └── logs/
+│
+├── docs/                         # 📚 Documentación compartida
+│   ├── PROTOCOLO_UNE_REFERENCIA.md
+│   └── RESUMEN_PROTOCOLO_UNE_135401-4.md
+│
+├── tools/                        # 🔧 Herramientas
+│   ├── ProxySnifferUNE.py       # Sniffer de tráfico
+│   └── analizar_*.py            # Analizadores
+│
+├── README.md
+└── CHANGELOG.md
 ```
+
+---
 
 ## 🚀 Uso
 
-### Ejecutar el Regulador (GUI)
+### Ejecutar el Regulador Virtual
 ```bash
+cd regulador
 python regulador_gui.py
 ```
 
-### Herramientas
+### Ejecutar la Central Virtual
 ```bash
-# Sniffer para capturar tráfico entre central y regulador real
-python tools/ProxySnifferUNE.py
+cd central
+python central_gui.py
 ```
 
-## ⚙️ Configuración
+### Probar ambos juntos
+1. Iniciar el **Regulador Virtual** (puerto TCP 5000 por defecto)
+2. Iniciar la **Central Virtual**
+3. Agregar un regulador con IP `127.0.0.1` puerto `5000`
+4. Conectar y probar comandos
 
-Editar `config/regulador_config.json` para:
-- Cambiar planes de regulación
-- Configurar grupos de semáforos
-- Establecer horarios
-- Configurar modo de control (LOCAL/ORDENADOR/MANUAL)
+---
 
-### Modos de Control
-- **modo_control: 1** = LOCAL (planes por horario interno)
-- **modo_control: 2** = ORDENADOR/CENTRALIZADO (planes por central)
-- **modo_control: 3** = MANUAL
+## 🚦 Regulador Virtual
+
+Simula un regulador de tráfico semafórico compatible con centrales UNE.
+
+### Características
+- Protocolo UNE 135401-4 Modo A y B
+- Interfaz gráfica con visualización de semáforos
+- Configuración de planes, fases y grupos
+- Conexión TCP/IP y Serial RS-232
+- Mensajes espontáneos (B9, B3)
+- Modos: LOCAL, CENTRALIZADO, MANUAL, INTERMITENTE
+
+### Configuración
+Editar `regulador/config/regulador_config.json`:
+- Planes de regulación (hasta 32)
+- Grupos de semáforos (hasta 16)
+- Fases y tiempos
+- Puerto TCP/COM
+
+---
+
+## 🖥️ Central Virtual
+
+Gestiona múltiples reguladores de tráfico simultáneamente.
+
+### Características
+- Hasta 48 reguladores por central
+- Conexión TCP/IP y Serial RS-232
+- Polling automático configurable
+- Comandos individuales y en bloque
+- Visualización de estado en tiempo real
+- Log de comunicaciones
+
+### Comandos disponibles
+| Comando | Código | Descripción |
+|---------|--------|-------------|
+| Sincronización | 0x91 | Consulta plan, hora, ciclo |
+| Cambio de Plan | 0xD1 | Selecciona plan de regulación |
+| Puesta en Hora | 0xD2 | Sincroniza reloj |
+| Estados | 0xD4 | Cambia modo (colores/intermitente/apagado) |
+| Alarmas | 0xB4 | Consulta alarmas |
+| Borrar Alarmas | 0xDD | Limpia alarmas |
+
+### Comandos en bloque
+- Cambiar plan a todos los reguladores
+- Poner todos en intermitente
+- Apagar todos
+- Sincronizar hora global
+
+---
 
 ## 📡 Protocolo UNE 135401-4
+
+### Modos de operación
+- **Modo A**: Síncrono - Regulador responde solo a peticiones
+- **Modo B**: Asíncrono - Regulador envía mensajes espontáneos
+
+### Subreguladores
+| ID | Hex | Responsabilidad |
+|----|-----|-----------------|
+| 128 | 0x80 | CPU: Alarmas, configuración, grupos, modo |
+| 129 | 0x81 | Planes: Sincronización, tráfico, selección |
+
+### Estructura de mensajes
+```
+[STX 0x02] [SUBREG] [CÓDIGO] [DATOS...] [CHECKSUM] [ETX 0x03]
+```
 
 ### Códigos principales
 | Código | Dirección | Descripción |
 |--------|-----------|-------------|
-| 0x91   | C→R / R→C | Sincronización (Plan en curso) |
-| 0x94   | C→R / R→C | Datos de tráfico |
-| 0xB3   | R→C       | Modo de control (respuesta a 0x20) |
-| 0xB4   | C→R / R→C | Alarmas |
-| 0xB5   | C→R / R→C | Parámetros de configuración |
-| 0xB6   | C→R / R→C | Tablas de programación |
-| 0xB7   | C→R / R→C | Incompatibilidades |
-| 0xB9   | R→C       | Estado de grupos |
-| 0xD1   | C→R / R→C | Selección de plan |
-| 0xD2   | C→R / R→C | Puesta en hora |
-| 0xD4   | C→R / R→C | Estados (modo, coordinación) |
-| 0x20   | C→R       | Petición de estado |
+| 0x91 | C↔R | Sincronización |
+| 0x94 | C↔R | Datos de tráfico |
+| 0xB3 | R→C | Modo de control (espontáneo) |
+| 0xB4 | C↔R | Alarmas |
+| 0xB9 | R→C | Estado de grupos (espontáneo) |
+| 0xD1 | C→R | Selección de plan |
+| 0xD2 | C→R | Puesta en hora |
+| 0xD4 | C→R | Estados (intermitente/colores/apagado) |
 
-### Subreguladores
-- **128 (0x80)**: CPU - Alarmas, configuración, grupos, modo (B3, B4, B9, D2)
-- **129 (0x81)**: Planes - Sincronización, tráfico, selección (91, 94, D1, D4)
+---
 
-### Conversión de IDs de Plan
-La central usa IDs 3, 4, 5... mientras el regulador usa 131, 132, 133...
-- **Recepción (D1)**: plan_central + 128 = plan_interno
-- **Reporte (0x91)**: plan_interno - 128 = plan_para_central
+## 🔧 Herramientas
 
-### Formato de mensajes
-```
-STX(02) + Subregulador + Código + [Datos...] + Checksum + ETX(03)
+### Sniffer UNE
+Captura y analiza tráfico entre central y regulador real:
+```bash
+python tools/ProxySnifferUNE.py
 ```
 
-Todos los bytes de datos tienen el bit 7 activo (valor | 0x80).
+---
 
-## 📋 Cambios Recientes
+## 📋 Requisitos
 
-Ver [CHANGELOG.md](CHANGELOG.md) para historial de cambios.
+- Python 3.8+
+- tkinter (incluido en Python)
+- pyserial (opcional, para conexión serial): `pip install pyserial`
+
+---
+
+## 📄 Licencia
+
+Este proyecto es software libre para uso educativo y de desarrollo.
+
+---
+
+## 🔗 Enlaces
+
+- [Changelog](CHANGELOG.md)
+- [Documentación del protocolo](docs/RESUMEN_PROTOCOLO_UNE_135401-4.md)

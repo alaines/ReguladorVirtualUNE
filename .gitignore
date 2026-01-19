@@ -28,6 +28,10 @@ env/
 
 # IDE
 .vscode/
+
+# Logs de aplicación
+regulador/logs/
+central/logs/
 .idea/
 *.swp
 *.swo

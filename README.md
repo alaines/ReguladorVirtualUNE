@@ -2,7 +2,7 @@
 
 Suite de herramientas para simulación y gestión de reguladores de tráfico compatibles con el protocolo **UNE 135401-4** (Modo A/B).
 
-**Versión Regulador: 1.11.0** | **Versión Central: 1.2.0** | [Ver cambios](CHANGELOG.md)
+**Versión Regulador: 1.11.0** | **Versión Central: 1.3.0** | [Ver cambios](CHANGELOG.md)
 
 ---
 

@@ -93,7 +93,7 @@ ESTILOS_GRUPOS = {
 class CentralGUI:
     """Interfaz gráfica principal de la Central"""
     
-    VERSION = "1.2.0"
+    VERSION = "1.3.0"
     
     def __init__(self, root):
         self.root = root
@@ -242,6 +242,9 @@ class CentralGUI:
     
     def _crear_widgets(self):
         """Crea todos los widgets de la interfaz"""
+        # Barra de menú
+        self._crear_menu()
+        
         # Frame principal
         self.main_frame = ttk.Frame(self.root, style='Dark.TFrame')
         self.main_frame.pack(fill='both', expand=True, padx=5, pady=5)
@@ -249,12 +252,149 @@ class CentralGUI:
         # Panel izquierdo - Lista de reguladores
         self._crear_panel_reguladores()
         
-        # Panel derecho - Detalle y controles
+        # Panel derecho - Detalle y controles (con scroll)
         self._crear_panel_detalle()
         
-        # Panel inferior - Log
-        self._crear_panel_log()
+        # Ventana de log (inicialmente oculta)
+        self.log_window = None
+        self._crear_panel_log_interno()
     
+    def _crear_menu(self):
+        """Crea la barra de menú"""
+        menubar = tk.Menu(self.root, bg=COLORES['panel'], fg=COLORES['texto'])
+        self.root.config(menu=menubar)
+        
+        # Menú Ver
+        menu_ver = tk.Menu(menubar, tearoff=0, bg=COLORES['panel'], fg=COLORES['texto'])
+        menubar.add_cascade(label="Ver", menu=menu_ver)
+        menu_ver.add_command(label="Ventana de Log", command=self._mostrar_ventana_log)
+        menu_ver.add_command(label="Cargar Planes...", command=self._cargar_planes_archivo)
+        menu_ver.add_separator()
+        menu_ver.add_command(label="Cargar Config Regulador Virtual", command=self._cargar_config_regulador)
+        
+        # Menú Conexión
+        menu_conexion = tk.Menu(menubar, tearoff=0, bg=COLORES['panel'], fg=COLORES['texto'])
+        menubar.add_cascade(label="Conexión", menu=menu_conexion)
+        menu_conexion.add_command(label="Conectar Seleccionado", command=self._conectar_regulador)
+        menu_conexion.add_command(label="Desconectar Seleccionado", command=self._desconectar_regulador)
+        menu_conexion.add_separator()
+        menu_conexion.add_command(label="Conectar Todos", command=self._conectar_todos)
+        menu_conexion.add_command(label="Desconectar Todos", command=self._desconectar_todos)
+        
+        # Menú Ayuda
+        menu_ayuda = tk.Menu(menubar, tearoff=0, bg=COLORES['panel'], fg=COLORES['texto'])
+        menubar.add_cascade(label="Ayuda", menu=menu_ayuda)
+        menu_ayuda.add_command(label="Acerca de", command=self._mostrar_acerca_de)
+    
+    def _mostrar_ventana_log(self):
+        """Muestra la ventana de log en una ventana separada"""
+        if self.log_window and self.log_window.winfo_exists():
+            self.log_window.lift()
+            self.log_window.focus_force()
+            return
+        
+        self.log_window = tk.Toplevel(self.root)
+        self.log_window.title("Log de Comunicaciones - Central Virtual UNE")
+        self.log_window.geometry("900x500")
+        self.log_window.configure(bg=COLORES['fondo'])
+        
+        # Frame principal
+        log_frame = ttk.Frame(self.log_window, style='Panel.TFrame')
+        log_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Barra de herramientas
+        toolbar = ttk.Frame(log_frame, style='Panel.TFrame')
+        toolbar.pack(fill='x', padx=5, pady=5)
+        
+        self.var_auto_scroll_ext = tk.BooleanVar(value=True)
+        ttk.Checkbutton(toolbar, text="Auto-scroll", variable=self.var_auto_scroll_ext,
+                        style='Dark.TCheckbutton').pack(side='left', padx=5)
+        
+        tk.Button(toolbar, text="Limpiar Log",
+                  bg=COLORES['panel_claro'], fg=COLORES['texto'],
+                  font=('Segoe UI', 9), relief='flat',
+                  command=self._limpiar_log_externo).pack(side='left', padx=5)
+        
+        tk.Button(toolbar, text="Guardar Log",
+                  bg=COLORES['acento'], fg=COLORES['texto'],
+                  font=('Segoe UI', 9), relief='flat',
+                  command=self._guardar_log).pack(side='left', padx=5)
+        
+        # Filtros
+        ttk.Label(toolbar, text="  Filtro:", style='Panel.TLabel').pack(side='left', padx=5)
+        self.var_filtro_log = tk.StringVar(value='Todos')
+        filtro_combo = ttk.Combobox(toolbar, textvariable=self.var_filtro_log, 
+                                     values=['Todos', 'TX', 'RX', 'INFO', 'ERROR'],
+                                     width=10, state='readonly')
+        filtro_combo.pack(side='left', padx=5)
+        
+        # Text widget para log extendido
+        self.log_text_ext = scrolledtext.ScrolledText(
+            log_frame,
+            bg=COLORES['panel_claro'],
+            fg=COLORES['texto'],
+            font=('Consolas', 10),
+            state='disabled',
+            relief='flat',
+            wrap='word'
+        )
+        self.log_text_ext.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Configurar tags
+        self.log_text_ext.tag_configure('INFO', foreground=COLORES['texto'])
+        self.log_text_ext.tag_configure('ERROR', foreground=COLORES['error'])
+        self.log_text_ext.tag_configure('WARNING', foreground=COLORES['advertencia'])
+        self.log_text_ext.tag_configure('TX', foreground='#3282b8')
+        self.log_text_ext.tag_configure('RX', foreground='#00a86b')
+        self.log_text_ext.tag_configure('HEX', foreground='#888888')
+        
+        # Barra de estado
+        status_frame = ttk.Frame(log_frame, style='Panel.TFrame')
+        status_frame.pack(fill='x', padx=5, pady=2)
+        
+        self.lbl_log_status = ttk.Label(status_frame, text="Líneas: 0", style='Panel.TLabel')
+        self.lbl_log_status.pack(side='left')
+    
+    def _limpiar_log_externo(self):
+        """Limpia el log de la ventana externa"""
+        if hasattr(self, 'log_text_ext') and self.log_text_ext.winfo_exists():
+            self.log_text_ext.config(state='normal')
+            self.log_text_ext.delete(1.0, tk.END)
+            self.log_text_ext.config(state='disabled')
+    
+    def _guardar_log(self):
+        """Guarda el log a un archivo"""
+        from tkinter import filedialog
+        from datetime import datetime
+        
+        archivo = filedialog.asksaveasfilename(
+            title="Guardar Log",
+            filetypes=[("Text files", "*.txt"), ("Log files", "*.log")],
+            defaultextension=".txt",
+            initialfile=f"central_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        )
+        
+        if archivo:
+            try:
+                with open(archivo, 'w', encoding='utf-8') as f:
+                    if hasattr(self, 'log_text_ext'):
+                        f.write(self.log_text_ext.get(1.0, tk.END))
+                    else:
+                        f.write(self.log_text.get(1.0, tk.END))
+                self._log(f"Log guardado en {archivo}", "INFO")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error guardando log: {e}")
+    
+    def _mostrar_acerca_de(self):
+        """Muestra información de la aplicación"""
+        messagebox.showinfo("Acerca de", 
+            f"Central Virtual UNE v{self.VERSION}\n\n"
+            "Gestión de reguladores de tráfico\n"
+            "Protocolo UNE 135401-4\n\n"
+            "Autor: Aland Laines Calonge\n"
+            "Email: alaines@movingenia.com\n"
+            "Web: https://movingenia.com")
+
     def _crear_panel_reguladores(self):
         """Crea el panel izquierdo con lista de reguladores"""
         self.panel_izq = ttk.Frame(self.main_frame, style='Panel.TFrame', width=280)
@@ -320,11 +460,11 @@ class CentralGUI:
         self._actualizar_lista_reguladores()
     
     def _crear_panel_detalle(self):
-        """Crea el panel derecho con detalle del regulador seleccionado"""
+        """Crea el panel derecho con detalle del regulador seleccionado (con scroll)"""
         self.panel_der = ttk.Frame(self.main_frame, style='Panel.TFrame')
         self.panel_der.pack(side='left', fill='both', expand=True)
         
-        # Título del regulador
+        # Título del regulador (fijo, fuera del scroll)
         self.titulo_regulador = ttk.Label(
             self.panel_der, 
             text="Seleccione un regulador",
@@ -332,9 +472,40 @@ class CentralGUI:
         )
         self.titulo_regulador.pack(fill='x', padx=10, pady=10)
         
-        # Frame para configuración y estado
-        content_frame = ttk.Frame(self.panel_der, style='Panel.TFrame')
-        content_frame.pack(fill='both', expand=True, padx=10)
+        # Canvas con scrollbar para el contenido
+        canvas_frame = ttk.Frame(self.panel_der, style='Panel.TFrame')
+        canvas_frame.pack(fill='both', expand=True)
+        
+        self.canvas_detalle = tk.Canvas(canvas_frame, bg=COLORES['panel'], 
+                                         highlightthickness=0)
+        scrollbar = ttk.Scrollbar(canvas_frame, orient='vertical', 
+                                   command=self.canvas_detalle.yview)
+        
+        self.canvas_detalle.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.canvas_detalle.configure(yscrollcommand=scrollbar.set)
+        
+        # Frame interno para contenido
+        content_frame = ttk.Frame(self.canvas_detalle, style='Panel.TFrame')
+        self.canvas_window = self.canvas_detalle.create_window((0, 0), window=content_frame, 
+                                                                anchor='nw')
+        
+        # Configurar scroll
+        def configure_scroll(event):
+            self.canvas_detalle.configure(scrollregion=self.canvas_detalle.bbox('all'))
+            # Ajustar ancho del frame interno al canvas
+            self.canvas_detalle.itemconfig(self.canvas_window, width=event.width)
+        
+        content_frame.bind('<Configure>', lambda e: self.canvas_detalle.configure(
+            scrollregion=self.canvas_detalle.bbox('all')))
+        self.canvas_detalle.bind('<Configure>', configure_scroll)
+        
+        # Scroll con rueda del mouse
+        def on_mousewheel(event):
+            self.canvas_detalle.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        self.canvas_detalle.bind_all("<MouseWheel>", on_mousewheel)
         
         # Panel de configuración
         self._crear_panel_config(content_frame)
@@ -1008,9 +1179,9 @@ class CentralGUI:
                   font=('Segoe UI', 9), relief='flat',
                   command=self._cmd_bloque_hora).grid(row=2, column=1, padx=5, pady=3)
     
-    def _crear_panel_log(self):
-        """Crea el panel inferior de logs"""
-        log_frame = ttk.LabelFrame(self.root, text="📜 LOG DE COMUNICACIONES", style='Dark.TLabelframe')
+    def _crear_panel_log_interno(self):
+        """Crea el panel inferior de logs (compacto)"""
+        log_frame = ttk.LabelFrame(self.root, text="LOG DE COMUNICACIONES", style='Dark.TLabelframe')
         log_frame.pack(fill='x', padx=5, pady=5)
         
         # Botones de control del log
@@ -1032,7 +1203,7 @@ class CentralGUI:
             bg=COLORES['panel_claro'],
             fg=COLORES['texto'],
             font=('Consolas', 9),
-            height=8,
+            height=6,
             state='disabled',
             relief='flat'
         )
@@ -1044,6 +1215,12 @@ class CentralGUI:
         self.log_text.tag_configure('WARNING', foreground=COLORES['advertencia'])
         self.log_text.tag_configure('TX', foreground='#3282b8')
         self.log_text.tag_configure('RX', foreground='#00a86b')
+        
+        # Botón para abrir ventana de log
+        tk.Button(btn_log_frame, text="Abrir en Ventana",
+                  bg=COLORES['acento'], fg=COLORES['texto'],
+                  font=('Segoe UI', 8), relief='flat',
+                  command=self._mostrar_ventana_log).pack(side='right', padx=5)
     
     # =========================================================================
     # EVENTOS Y CALLBACKS
@@ -1073,6 +1250,8 @@ class CentralGUI:
         self.polling_activo = False
         self._desconectar_todos()
         self._guardar_config()
+        if self.log_window and self.log_window.winfo_exists():
+            self.log_window.destroy()
         self.root.destroy()
     
     # =========================================================================
@@ -1486,10 +1665,12 @@ class CentralGUI:
         self.log_queue.put((f"{timestamp} {mensaje}", nivel))
     
     def _procesar_logs(self):
-        """Procesa la cola de logs y actualiza el widget"""
+        """Procesa la cola de logs y actualiza los widgets de log"""
         try:
             while True:
                 mensaje, nivel = self.log_queue.get_nowait()
+                
+                # Log principal (compacto)
                 self.log_text.configure(state='normal')
                 self.log_text.insert('end', mensaje + '\n', nivel)
                 
@@ -1503,13 +1684,29 @@ class CentralGUI:
                 
                 if self.var_auto_scroll.get():
                     self.log_text.see('end')
+                
+                # Log externo (si existe)
+                if self.log_window and self.log_window.winfo_exists():
+                    if hasattr(self, 'log_text_ext'):
+                        self.log_text_ext.configure(state='normal')
+                        self.log_text_ext.insert('end', mensaje + '\n', nivel)
+                        self.log_text_ext.configure(state='disabled')
+                        
+                        if hasattr(self, 'var_auto_scroll_ext') and self.var_auto_scroll_ext.get():
+                            self.log_text_ext.see('end')
+                        
+                        # Actualizar contador
+                        if hasattr(self, 'lbl_log_status'):
+                            lines_ext = int(self.log_text_ext.index('end-1c').split('.')[0])
+                            self.lbl_log_status.config(text=f"Líneas: {lines_ext}")
+                
         except queue.Empty:
             pass
         
         self.root.after(100, self._procesar_logs)
     
     def _limpiar_log(self):
-        """Limpia el log"""
+        """Limpia el log principal"""
         self.log_text.configure(state='normal')
         self.log_text.delete('1.0', 'end')
         self.log_text.configure(state='disabled')

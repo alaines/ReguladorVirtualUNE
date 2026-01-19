@@ -149,9 +149,19 @@ class ConexionTCP(ConexionBase):
         except Empty:
             return b''
     
+    def reconectar(self) -> bool:
+        """Intenta reconectar"""
+        logger.info(f"[{self.nombre}] Intentando reconectar...")
+        self.desconectar()
+        time.sleep(0.5)
+        return self.conectar()
+    
     def _receptor_loop(self):
         """Hilo receptor de datos"""
         buffer = b''
+        sin_datos_count = 0
+        max_sin_datos = 60  # ~30 segundos sin datos antes de considerar timeout
+        
         while self._running and self.conectado:
             try:
                 if self._socket:
@@ -160,6 +170,7 @@ class ConexionTCP(ConexionBase):
                     if data:
                         buffer += data
                         self.bytes_recibidos += len(data)
+                        sin_datos_count = 0  # Reset contador
                         
                         # Procesar mensajes completos (STX ... ETX)
                         while b'\x02' in buffer and b'\x03' in buffer:
@@ -175,7 +186,8 @@ class ConexionTCP(ConexionBase):
                     else:
                         # Conexión cerrada por el otro lado
                         self.conectado = False
-                        logger.warning(f"[{self.nombre}] Conexión cerrada por el regulador")
+                        self.ultimo_error = "Conexión cerrada por el regulador"
+                        logger.warning(f"[{self.nombre}] {self.ultimo_error}")
                         break
                         
             except socket.timeout:

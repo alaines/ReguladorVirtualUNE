@@ -1,0 +1,1837 @@
+informe UNE
+UNE 135401-4 IN
+
+
+
+
+
+Febrero 2003
+Equipamiento para la señalización vial Reguladores de tráfico
+Parte 4: Protocolo de comunicaciones Tipo M
+
+
+
+Road traffic signal equipment. Traffic signal controllers. Part 4: Comunications protocol. Type M. Equipement pour la signalisation routiere. Controleurs de trafic. Partie 4: Protocole de comunications. Type M.
+
+
+
+
+Este informe ha sido elaborado por el comité técnico AEN/CTN 135 Equipamiento para la Señalización Vial cuya Secretaría desempeña AFASEMETRA.
+
+
+
+
+
+
+
+
+
+
+
+Editada e impresa por AENOR Depósito legal: M 8684:2003
+LAS OBSERVACIONES A ESTE DOCUMENTO HAN DE DIRIGIRSE A:
+
+
+
+
+
+
+ÍNDICE
+Página
+
+
+
+
+OBJETO Y CAMPO DE APLICACION
+Este informe contiene las especificaciones mínimas que deben cumplir los reguladores para poderse comunicar adecua- damente en sistemas de tráfico centralizado.
+
+
+NORMAS PARA CONSULTA
+UNE 135401-1 EX  Equipamiento para la señalización vial. Reguladores de tráfico. Características funcionales.
+
+UNE 135401-2 EX  Equipamiento para la señalización vial. Reguladores de tráfico. Métodos de prueba.
+Modelo de arquitectura de interconexión de sistemas abiertos (OSI-Open System Interconnection) de la Norma Interna- cional ISO.
+Recomendación V24 de la CCITT. Recomendación V28 de la CCITT.
+Este documento sigue en su descripción la recomendación de niveles OSI, de acuerdo a la siguiente estructura:
+
+Nivel físico
+
+Nivel de enlace de datos
+
+Nivel de red
+
+Nivel de transporte
+
+Nivel de sesión
+
+Nivel de presentación
+
+
+NIVEL FÍSICO
+
+Especificaciones mecánicas
+Los reguladores (ETD) deberán llevar un conector para su conexión al equipo de transmisión de datos (ETCD). Este conector será del tipo "canon" de 25 contactos, hembra. Podrá usarse alternativamente un conector "canon" de 9 contactos, hembra.
+
+Especificaciones eléctricas
+Las características eléctricas de los circuitos de enlace entre el regulador (ETD) y el equipo transmisor de datos (ETCD) cumplirán con la recomendación V.28 del CCITT.
+
+Características funcionales
+Los circuitos de unión entre el ETD y el ETCD cumplirán con la recomendación V.24 del CCITT que coincide con la Norma Americana RS-232-C.
+
+
+
+
+La asignación de contactos es como sigue:
+
+
+
+Características del procedimiento
+La conexión entre el ETD y el ETCD es permanente, y la iniciación de la transmisión es libre (full-duplex).
+
+
+NIVEL DE ENLACE DE DATOS
+El tipo de enlace que se establece es punto a punto.
+
+El protocolo se orienta a carácter. La comunicación es asincrona con las siguientes características:
+1 bit de start;
+8 bits de datos;
+1 bit de paridad impar;
+1 bit de stop.
+Los mensajes son de longitud variable. Se usan como delimitadores de mensaje:
+STX. Cabecera de mensaje, código	00000010
+EOT. Fin de mensaje parcial, código	00000100
+ETX. Fin de mensaje, código	00000011
+La comunicación usa el protocolo DC1/DC3 o XON/XOFF mediante el cual se deja de transmitir al recibir un DC3 o XOFF y se reinicia la transmisión al recibir un DC1 o XON.
+Ante cualquier recepción de un mensaje se responde con un ACK o con un NACK, según se haya dado por bueno o por incorrecto el mensaje. En el segundo caso (incorrecto) el elemento exterior volverá a mandar el mensaje.
+Para el control de errores el protocolo usa paridad de carácter (impar) como se ha establecido anteriormente y CHECKSUM.
+
+
+
+
+Formatos de mensaje
+
+Mensajes ordenador  central y central  ordenador
+Estos mensajes están formados por:
+1er 2ndo 3er 4rto 5nto
+................
+................
+................
+Último-1 byte CHECK	1 ----------
+Último byte ETX o EOT	00000011 ó 0000100
+Si el número de regulador es cero se entiende que el mensaje va dirigido a todos los reguladores. La central tiene códi- go 50 (decimal).
+
+Mensajes central  regulador y regulador  central
+Estos mensajes están formados por:
+1er 2ndo 3er
+................
+................
+................
+Último-1 byte CHECK	1 ----------
+Último byte ETX o EOT	00000011 ó 00000100
+
+El CHECK es la función EXCLUSIVE OR de todos los bytes de un mensaje que no sean mensajes especiales de un byte, y sólo afecta a los 7 bits de menor peso de cada byte.
+Estructura del byte de código:
+
+X X X X X X X X
+–	–
+–	–	–	–
+–	–	códigos
+–	–	–
+–	00 libre
+–	01 control
+–	10 tablas
+–	11 información
+–	–
+0 pregunta
+1 envío
+
+1
+
+
+
+
+Mensajes especiales de un byte
+Existen varios mensajes especiales de un byte que son:
+STX.	Cabecera de mensaje, código	00000010
+EOT.	Fin de mensaje parcial, código	00000100
+ETX.	Fin de mensaje, código	00000011
+DC1.	Comunicaciones ON, código	00010001
+DC3.	Comunicaciones OFF, código	00010011
+ACK.	Entendido comunicaciones, código	00000110
+
+NACK.	No entendido comunicaciones, código	00010101
+
+DET.	Envío de petición de detectores.
+Código	00100000
+
+El regulador al recibir el código DET almacena los datos de detectores, pone a cero los registros y envía los datos almacenados.
+Este mensaje va de ordenador a sistema.
+
+TRCAM.	Estado detectores (cuatro) en tiempo real.
+
+Código	XXXX
+Bit 0	Detector N1
+Bit 1	Detector N2
+Bit 2	Detector N3
+Bit 3	Detector N4
+Activado	1
+Desactivado	0
+
+Este mensaje va de sistema a ordenador.
+
+HTR.	Hora en tiempo real (ejecución de actualización).
+Código	00110011
+
+El regulador al recibir este mensaje actualiza la hora previamente recibida.
+
+PRH.	Petición hora en tiempo real.
+Código	01NNNNNN
+
+Siendo NNNNNN, el número (binario) del regulador a que va destinado. NNNNNN = 000000 es orden para todos los reguladores y central.
+Este mensaje va de ordenador a central. De central a regulador se enviará siempre 01000000.
+
+
+
+
+Estos mensajes no participan del protocolo DC1/DC3 ni del ACK/NACK, y pueden ser enviados en cualquier momento, incluyéndose en cualquier transmisión en curso sin alterarla.
+
+
+NIVEL DE RED
+La topología de la red definida en esta norma es una red en estrella. No existe un protocolo propio de la red.
+
+NIVEL DE TRANSPORTE
+No es aplicable a esta normativa.
+
+
+NIVEL DE SESIÓN
+El regulador puede estar en dos estados:
+
+sesión de comunicación abierta (estado normal y permanente);
+
+sesión de comunicación cerrada (fallo de comunicaciones).
+Con la puesta en marcha el regulador pasa al estado de comunicación abierta, donde permanece indefinidamente a menos que se produzca un fallo.
+
+Para que el regulador pase a sesión de comunicacion cerrada deben darse las siguientes circunstancias de manera consecutiva:
+No recibir ACK en 10 s después de haber enviado un mensaje. En este caso el regulador repite el envio del mensaje. Repetir tres veces el envio de mensaje sin recibir ACK.
+
+No recibir ningún mensaje en 180 s. o bien:
+1) Recibe tres NACK consecutivos a un mensaje y sus repeticiones.
+
+Cuando el regulador pasa a sesión de comunicación cerrada, anula todos los mensajes pendientes de envío y no trata ningún mensaje de llegada, salvo contestar con ACK si formalmente es correcto. A partir de este momento envía la palabra de estado cada 10 s, hasta que recibe el ACK. A partir de ese instante pasa a sesión de comunicación abierta.
+
+
+NIVEL DE PRESENTACIÓN
+Con el fin de adaptarse a las filosofías de intercambio de información de los diferentes tipos de sistemas centralizados que pueden operar con el regulador, se establecen dos modos de gestión de las respuestas que permiten implantar tanto sistemas en los que predominen los intercambios sincronos como asincronos.
+Estos modos se denominan modo A y modo B y establecen diferencias con respecto a las respuestas del regulador.
+
+En lo sucesivo se especifica, cada vez que proceda, el comportamiento del regulador según el modo de funcionamien- to A o B que opere. Este modo se establece por medio de un parámetro.
+
+
+
+
+Codificación de directivas
+Se establecen los siguientes tipos de directivas:
+
+Directivas de control
+Plan registrable
+
+Subregulador:	(0,1,2,3,4) Directiva:	 1X010000
+Nº de la estructura	1 byte
+Nº tabla de fases transitorias	1 byte
+Nº de tabla tiempos mínimos	1 byte
+Desfase en segundos	2 bytes (256 s)
+Modo control actuado total	1 byte
+Duración de fases en segundos	N bytes (120 s)
+
+El byte de modo de control actuado total representa el modo de funcionamiento a falta de demandas y se configura: 10000000 permanece en la última fase demandada.
+1xxxxxxx número de fase a la que va.
+
+
+Estructura del desfase:
+
+1er byte	1000 00XX
+
+
+
+MSB
+
+
+
+2do byte	1XXX XXXX
+
+LSB
+
+
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010000. Regulador en modo B: No hay.
+Respuesta a la petición de un subregulador no definido o sin plan registable: Directiva sin datos.
+
+Selección de plan
+Subregulador:	(0,1,2,3,4) Directiva:	 1X010001
+
+Nº de plan	1 byte
+Hora de inicio del plan	1 byte
+Minuto de inicio del plan	1 byte
+Segundos de inicio del plan	1 byte
+El plan cero es el registrable. Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010001. Regulador en modo B: Ver la respuesta (orden y pregunta) en 8.1.3 a).
+
+
+
+
+Puesta en hora y fecha del reloj Subregulador:	(0)
+Directiva:	1X010010
+Día de la semana	1 byte
+Hora	1 byte
+Minuto	1 byte
+Segundo	1 byte
+Día del mes	1 byte
+Mes	1 byte
+Año	1 byte
+Esta directiva se combina con el HTR. Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010010. Regulador en modo B: No hay.
+Detectores XX en tiempo real (envío solamente) Subregulador:	(0)
+Directiva:	11010011
+Detector N1	1 byte
+Detector N2	1 byte
+Detector N3	1 byte
+Detector N4	1 byte
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010011
+Regulador en modo B: El regulador envía el estado de los detectores (TRCAM) en respuesta al mensaje. El regulador envia el mensaje TRCAM cada vez que se produzca un cambio en el estado de los detectores hasta la cancelación de la orden.
+Detectores XX fuera de tiempo real (envío solamente) Subregulador:  (0)
+Directiva:	11010011
+Es la misma que en d) sin número de detectores. Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010011. Regulador en modo B: No hay.
+Estados
+Subregulador: (0,1,2,3,4) Directiva:	1X010100
+
+Apagado	0 /
+Intermitente	1 / 1 byte
+Colores	2 /
+.	4 /
+.	8 /
+.	16 /
+.	32 /
+
+
+
+
+Control local de planes (horario)	0 /
+Control externo seleccionado de planes.	1 / 1 byte
+Control externo por ICF	2/
+Plan seleccionado por ordenador	4 /
+.	8 /
+.	16 / Reservados
+.	32 /
+Coordinado con señal externa	0 /
+Coordinado con reloj interno	1 /
+Coordinado por ordenador	2 /
+Control centralizado	4 / 1 byte
+Control manual	8
+Control ordenador grupos mando directo	16 /
+.	32 / Reservados
+Tiempos fijos	0 /
+Semiactuado	1 /
+Actuado total	2 / 1 byte
+Habilitación emergencia (orden)	4 / En orden un 1 en bit de Estado habilitación de fase de
+
+emergencia (respuesta)
+
+.	8 /
+emergencia, habilita dicha fase. En respuesta, un 1 indica que ha salido la fase de emergencia.
+
+.	16 / Reservados
+.	32 /
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010100. Regulador en modo B: No hay.
+El mensaje de estado lo envía el Regulador automáticamente siempre que varíe su información.
+Impulso de cambio de fase (envío solamente) Subregulador:	(0,1,2,3,4)
+Directiva:	11010101
+Nº de la fase entrante	1 byte
+Nº de la fase	NN (1 a 32)
+Avance a la siguiente fase.	0
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010101. Regulador en modo B: No hay.
+
+Mando directo de salidas
+Subregulador:	(0) Directiva:	 1X010110
+Nº de grupo	1 byte
+Estado	1 byte
+Nº de grupo	1 byte
+Estado	1 byte
+...
+...
+etc.
+
+
+
+
+
+
+		
+Rojo Ámbar Verde
+Sencillo (0), Doble (1)
+
+estados:	00 apagado
+01 encendido
+intermitente rápido
+intermitente lento
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11010110. Regulador en modo B: No hay.
+
+Mensaje alfanumérico a canal XX (envío solamente)
+Subregulador:	(0)
+Directiva:	11011000
+Nº de canal XX	1 byte
+N bytes caracteres con bit 7=1
+
+Canal 00 memoria del regulador Canal 01 terminal local
+Canal 0X línea auxiliar X
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11011000. Regulador en modo B: No hay.
+
+Mensaje de acceso a grabación de datos (envío solamente)
+Subregulador:	(0)
+Directiva:	11011001
+Código de seguridad (password)	12 bytes
+Los 12 bytes constan de 12 caracteres en código ASCII Código de regulador	6 bytes
+Los seis bytes constan de seis caracteres en código ASCII
+
+
+Versión de Software	4 bytes (ASCII)
+Los cuatro bytes constan de cuatro caracteres en código ASCII
+Si por alguna razón no entra en grabación responde con la palabra de alarmas.
+
+
+
+
+Mensaje de fin de acceso a grabación de datos
+
+Total 19 bytes (cuatro por subregulador mas tres generales).
+Cada bit de cada byte representa una tabla, empezando por el bit menos significativo del primer byte. Si el bit es cero, la tabla es coherente.
+Si el bit es uno, la tabla no es coherente.
+El primer bit del primer byte de subregulador corresponde a la tabla 15 que es la primera de los subreguladores. Los cuatro bytes cubren desde la tabla 15 a la tabla 42 ambas inclusive.
+El 2ndo y 3er bytes generales cubren 14 tablas generales.
+
+El primer byte general corresponde a un código de error(4 bits) y un número de subregulador (3 bits).
+
+Byte 1	1XXX XXX
+
+–	–
+–	Código de error
+–
+-	N1 de subregulador
+
+Byte 2	1XXX XXXX
+Tabla 1
+
+Byte 3	1XXX XXXX
+Tabla 14
+
+
+SUBREGULADOR 1
+
+
+Byte 4	1XXX XXXX
+
+:
+:
+Byte 7	1XXX XXXX
+
+:
+:
+:
+
+SUBREGULADOR 4
+
+Byte 16	1XXX XXXX
+
+:
+:
+Byte 19	1XXX XXXX
+
+Tabla 15
+
+
+
+Tabla 42
+
+
+
+
+
+
+
+
+Tabla 15
+
+
+
+Tabla 42
+
+
+
+
+Cruce en tiempo real (envío solamente) Subregulador:	(0)
+Directiva:	11011011
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11011011.
+Regulador en modo B: El regulador responde con el mensaje 8.1.3.K. El regulador envía permanentemente el mensaje cada vez que se produzca un cambio hasta la cancelación de la orden.
+Cancelación de tiempo real (envío solamente) Subregulador:	(0)
+Directiva:	11011100
+
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11011100. Regulador en modo B: No hay.
+Borrado de alarmas (envío solamente) Subregulador:	(0)
+Directiva:	11011101
+
+Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. Código 11011101. Regulador en modo B: No hay.
+
+Directivas generales de tablas
+Las tablas tienen una directiva común para todas.
+
+Nº subregulador	0:	Tablas 1 a 14 subregulador 0
+1:	Tablas 15 a 42 subregulador 1
+2:	Tablas 15 a 42 subregulador 2
+3	Tablas 15 a 42 subregulador 3
+4:	Tablas 15 a 42 subregulador 4 El byte siguiente indica el número de tabla.
+Directiva general:	1X100000 tabla sin partir.
+
+
+
+
+En el caso de envíos partidos se utilizan dos bytes:
+Directiva general:	1X100001 tabla partida. Número de bloque: 1XXXXXXX de 1 a 127.
+Para borrar una tabla se envía el código de tabla sin datos y con fin de bloque, código 12(8). Respuesta a la orden:
+Regulador en modo A: Directiva sin datos. El código es siempre el del envío de tabla sin partir 11100000 Regulador en modo B: No hay.
+Respuesta a la petición de una tabla vacía:
+
+
+Tablas generales (subregulador 0)
+Grupos de tráfico y mando directo
+Número de tabla	10000001
+Nº de grupos de tráfico	1 byte
+1er grupo de mando directo	1 byte
+Nº de grupos de mando directo	1 byte
+12(8) fin de bloque	1 byte
+Si la tabla empieza con un cero, todos los grupos son de tráfico.
+
+Definición de detectores físicos
+Nº de tabla	10000010
+Nº de detectores estratégicos	1 byte
+1er detector táctico.	1 byte
+Nº de detectores tácticos	1 byte
+12(8) fin de bloque	1 byte
+
+Tabla de definición de detectores lógicos
+Número de tabla	10000011
+Número de detector lógico	1 byte
+Número de detector físico	1 byte
+*  Característica del detector	1 byte
+Parámetro 1	1 byte
+Parámetro 2	1 byte
+Parámetro 3	1 byte
+Parámetro 4	1 byte
+14(8) fin de bloque	1 byte
+Número de detector lógico	1 byte
+Número de detector físico	1 byte
+*  Característica del detector.	1 byte
+Parámetro 1	1 byte
+Parámetro 2	1 byte
+Parámetro 3	1 byte
+Parámetro 4	1 byte
+14(8) fin de bloque	1 byte
+12(8) fin de bloque	1 byte
+
+
+
+
+El byte de característica es:
+
+–  –  –  –  –	Salida normal/complem.(0/1)
+–  –  –  –  –
+–  –  –  –	Pulsador peat. no/si (0/1)
+–  –  –  –
+–  –	Detector veloc. no/si (0/1)
+–  –  –
+–	Aparición de fase no/si(0/1)
+–  –
+Libre
+
+Libre
+
+El parámetro 1 representa según la característica:
+(*)	Velocidad	Distancia entre espiras(m)
+Colas absolutas	Ocupación (0-120 s)
+Fase generadora de demanda	Número de la fase
+
+El parámetro 2 representa según la característica:
+(**)	Velocidad	Distancia entre espiras(cm)
+Colas porcentaje	Ocupación en porcentaje
+Subregulador	Número de subregulador
+
+El parámetro 3 representa siempre:
+Temporización (0-120 s)
+
+El parámetro 4 representa siempre:
+
+Retardo (0-120 s)
+(*)	En el detector siguiente: velocidad límite en km/h. (**)	En el detector siguiente: ancho de la espira en dm.
+
+Definido un detector lógico como detector de velocidad, el siguiente detector lógico queda asignado como segundo detector (a efectos de cálculo de velocidad). Se entiende como primer detector el primero que hay en el sentido de la marcha.
+Tabla de definición y cancelación de demandas
+
+Número de tabla	10000100
+Nº de demanda	1 byte
+Máscara de actuación de memoria	3 bytes
+Máscara de tipo de memoria	3 bytes
+Término uno (C1)	3 bytes
+Término uno (M1)	3 bytes
+Término dos (C2)	3 bytes
+Término dos (M2)	3 bytes
+...
+...
+
+
+
+
+14(8) fin de bloque	1 byte
+Nº de demanda	1 byte
+Máscara de actuación de memoria	3 bytes
+Máscara de tipo de memoria	3 bytes
+Término uno (C1)	3 bytes
+Término uno (M1)	3 bytes
+Término dos (C2)	3 bytes
+Término dos (M2)	3 bytes
+...
+...
+14(8) fin de bloque	1 byte
+...
+etc.
+12(8) fin de bloque	1 byte
+Los términos son cada uno de los elementos de la forma canónica de la expresión lógica (booleana) de las demandas.
+
+D=(R a C1)*M1+(R a C2)*M2+......
+a, significa "o exclusiva"
+*, significa "función y lógica"
+R, estado real de los detectores lógicos en función de las máscaras de actuación de memoria y de tipo de memoria. C1 Máscara de complementos.
+M1 Máscara de tratamiento
+Byte 1: Detectores 7-6-5-4-3-2-1
+Byte 2: Detectores 14-13-12-11-10-9-8
+Byte 3: Detectores 21-20-19-18-17-16-15
+
+La máscara de actuación de memoria representa:
+señal directa
+señal memorizada
+
+La máscara de tipo de memoria representa:
+señal memorizada por flanco
+señal memorizada por nivel
+Tabla de incompatibilidades
+
+Número de tabla	10000101
+
+Nº del grupo de referencia	1 byte
+Grupos incompatibles	1 byte  N
+14(8) fin de bloque	1 byte
+Nº del grupo de referencia	1 byte
+Grupos incompatibles	1 byte  N
+14(8) fin de bloque	1 byte
+...
+etc.
+12(8) fin de bloque	1 byte
+N número de grupos incompatibles con el de referencia.
+
+Se envía todos los grupos incompatibles con todos los grupos incompatibles entre si, de manera que la tabla sea completamente simétrica.
+
+
+
+
+Tabla de días especiales
+Número de la tabla	10000110
+
+Número de mes	1 byte
+Día del mes	1 byte
+Tipo de día	1 byte
+14(8) fin de bloque	1 byte
+Número del mes	1 byte
+Día del mes	1 byte
+Tipo de día	1 byte
+14(8) fin de bloque	1 byte
+...
+etc.
+12(8) fin de bloque	1 byte
+Tipos de día:
+Lunes	1
+.....
+Domingo	7
+Tabla de intermitencias
+Número de tabla	10000111
+Intermitencia	1 ON (0,1 s)	1 byte
+"	1 OFF (0,1 s)	1 byte
+"	2 ON (0,1 s)	1 byte
+"	2 OFF (0,1 s)	1 byte
+"	2(8) fin de bloque	1 byte
+La intermitencia 2 es la considerada como rápida en 8.1.2.2.b (código de colores).
+Tabla de modo de funcionamiento
+Número de tabla	10001000
+Dato 1	1 byte
+12(8) fin de bloque	1 byte
+El byte de dato 1 se configura:
+1  Y Y Y X X X	X
+--------	----	----
+–	–	–
+–	modo de funcionamiento
+–	–
+modo selección planes
+
+Reservados
+
+modo funcionamiento:	00 tiempos fijos
+01 semiactuado
+10 actuado total
+modo selección planes:	00 local horario
+01 control externo
+
+
+
+
+i) Tabla de tratamiento de alarmas
+Número de tabla	10001001
+Grupo averiado verde	1 byte
+Grupo averiado ámbar	1 byte
+Grupo averiado rojo	1 byte
+Lámpara fundida verde	1 byte
+Lámpara fundida ámbar	1 byte
+Lámpara fundida rojo	1 byte
+Temperatura fuera de intervalo	1 byte
+Tensión fuera de intervalo	1 byte
+Grabación local	1 byte
+Alarmas programadas	7 bytes
+12(8) fin de bloque	1 byte
+Los bytes se estructuran según lo que se quiera hacer con las alarmas, de la siguiente manera:
+
+transmite
+
+8.1.2.2	Tablas por subregulador
+Tabla de configuración de grupos de salida. (fases estables)
+Número de tabla	10001111
+Nº de fase	1 byte
+Estado del grupo	N bytes (N nº de grupos)
+14(8) fin de bloque	1 byte
+Nº de fase	1 byte
+Estado del grupo	N bytes
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+Cada fase tiene asignados los colores de todos los grupos utilizados.
+
+Tabla de configuración de grupos de salida. (posiciones de las fases transitorias)
+Número de tabla	10010000
+Nº de posición	1 byte
+Estado del grupo	N bytes (N nº de grupos)
+14(8) fin de bloque	1 byte
+Nº de posición	1 byte
+Estado del grupo	N bytes
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+
+
+
+
+Cada posición tiene asignados los colores de todos los grupos utilizados. Tabla de código de colores:
+Apagado	0
+Verde	1
+Ambar	2
+Rojo	3
+Verde intermitente rápido	4
+Ambar intermitente	5
+V/A intermitente doble	6
+Verde intermitente rojo	7
+Rojo/ámbar	8
+Verde/ámbar intermitente protección	9
+Verde intermitente rápido/ámbar intermitente protección	10
+Rojo/ámbar intermitente protección	11
+.	12 /
+.	13 /
+.	14 / reservados
+.	15 /
+.	16 /
+del 17 en adelante libres
+Tabla de asignación de posiciones a fases transitorias. (fases transitorias)
+Número de tabla	10010001
+Nº de transitorio	byte
+Nº de 1era posición	byte
+Nº de 2nda posición	byte
+...
+...
+14(8) fin de bloque	byte
+Nº de transitorio	byte
+Nº de 1era posición	byte
+Nº de 2nda posición	byte
+...
+...
+14(8) fin de bloque	byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+Tabla de estructuras.
+Tablas de Fases estables y transiciones.
+Número de tabla	10010010
+Nº de tabla de estructura	1 byte
+Fase A	1byte / secuencias
+Fase B	1 byte / de fases a
+Fase C	1 byte / transitorio fijos
+...
+...
+
+
+
+
+15(8) fin de bloque	1 byte
+Fase L	1 byte / fases
+Fase M	1 byte / secundarias
+Fase N	1 byte / actuadas
+...
+15(8) fin de bloque	1 byte
+Fase A salida	1 byte
+Fase B llegada	1 byte
+Transición nº	1 byte
+Fase B salida	1 byte
+Fase C llegada	1 byte
+Transición nº	1 byte
+...
+...
+14(8) fin de bloque	1 byte
+Nº de tabla de estructura	1 byte
+Fase A	1 byte
+Fase B	1 byte
+...
+...
+15(8) fin de bloque	1 byte
+Fase L	1 byte / fases
+Fase M	1 byte / secundarias
+Fase N	1 byte / actuadas
+...
+...
+15(8) fin de bloque	1 byte
+Fase A salida	1 byte
+Fase B llegada	1 byte
+Transición nº	1 byte
+Fase B salida	1 byte
+Fase C llegada	1 byte
+Transición nº	1 byte
+...
+...
+14(8) fin de bloque	1 byte
+...
+etc.
+12(8) fin de bloque	1 byte
+
+Tabla de asignación de acciones a demandas
+Número de tabla	10010011
+
+Nº de acción	1 byte
+Nº de demanda	1 byte
+Tipo de acción	1 byte
+Nº de elemento que actúa	1 byte
+Forma de cancelación	1 byte
+Máscara de cancelación	3 bytes
+Estado	1 byte
+14(8) fin de bloque	1 byte
+Nº de acción	1 byte
+Nº de demanda	1 byte
+Tipo de acción	1 byte
+Nº de elemento que actúa	1 byte
+Forma de cancelación	1 byte
+
+
+
+
+Máscara de cancelación	3 bytes
+Estado	1 byte
+14(8) fin de bloque	1 byte
+...
+etc.
+12(8) fin de bloque	1 byte
+
+Bits 0-5	Número del grupo de tráfico
+Bit 6 (=1)	Tipo de acción: en función del estado del grupo de tráfico. (*) Byte 1:
+Bits 0-6	Número de grupo de mando directo (**) Byte 2:
+Bit 0	0/1 Cancela Inicio/Fin de fase
+Bit 1	0/1 No/si se ejecuta durante la fase
+Bit 2-6	Número de fase que cancela la demanda (*****) Byte 2:
+Bit 0	 0/1 Cancela Inicio/Fin de Estado Bit 1	0/1 No/si se ejecuta en el estado Bit 2-6	 Estado del grupo de tráfico
+(***) Byte 3:
+
+Bits 0-6	Estado del grupo de mando directo (según el apartado 8.1.3 j)
+La máscara de cancelación representa los detectores lógicos que se borran al cumplimentarse la demanda según se establezca en la forma de cancelación.
+
+Byte 1: detectores 7-6-5-4-3-2-1
+Byte 2: detectores 14-13-12-11-10-9-8
+Byte 3: detectores 21-20-19-18-17-16-15
+Bit (detector) = 0 no se borra Bit (detector) = 1 borrado
+
+
+
+
+Tablas de asignación transitorios a tabla de tiempos
+Número de tabla	100101100
+Nº tabla transitorios-tiempos	1 byte
+Número de transitorio	1 byte
+Número de tabla de tiempos	1 byte
+Número de transitorio	1 byte
+Número de tabla de tiempos	1 byte
+...
+...
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+
+Tablas de asignación de tiempos a las transiciones
+
+Número de tabla	10010101
+Nº de tabla de fases transitorias	1 byte
+Nº de transitorio	1 byte
+Tiempo de posición 1	1 byte (1 a 120 s)
+Tiempo de posición 2	1 byte (1 a 120 s)
+...
+...
+15(8) fin de bloque	1 byte
+Nº de transitorio	1 byte
+Tiempo de posición 1	1 byte (1 a 120 s)
+Tiempo de posición 2	1 byte (1 a 120 s)
+...
+...
+(1 a 120 s) 14(8) fin de bloque.	1 byte
+
+Nº de tabla de fases transitorias	1 byte
+
+Nº de transitorio	1 byte
+Tiempo de posición 1	1 byte (1 a 120 s)
+Tiempo de posición 2	1 byte
+...
+...
+15(8) fin de bloque	1 byte
+Nº de transitorio	1 byte
+Tiempo de posición 1	1 byte (1 a 120 s)
+Tiempo de posición 2	1 byte (1 a 120 s)
+...
+...
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+
+
+
+
+Tabla de asignación de tiempos mínimos y extensiones de las fases estables (tiempos mínimos y extensiones)
+Número de tabla	10010110
+
+Nº de tabla de fases estables	1 byte
+Tiempo mínimo fase A	1 byte (1 a 120 s)
+Tiempo extensión fase A	1 byte (1 a 120 s)
+Tiempo mínimo fase B	1 byte (1 a 120 s)
+Tiempo extensión fase B	1 byte (1 a 120 s)
+...
+...
+14(8) fin de bloque	1 byte
+Nº de tabla de fases estables	1 byte
+Tiempo mínimo fase A	1 byte (1 a 120 s)
+Tiempo extensión fase A	1 byte (1 a 120 s)
+Tiempo mínimo fase B	1 byte (1 a 120 s)
+
+Tiempo extensión fase B	1 byte (1 a 120 s)
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+Planes almacenados
+
+Número de tabla	10010111
+
+Nº de plan	1 byte
+Nº de estructura	1 byte
+Nº de tabla de tiempos fases transitorias	1 byte
+Nº tabla de tiempos mínimos y de extensión	1 byte
+Desfase	2 bytes (0 a 256 s)
+Modo control actuado total	1 byte
+Duración fase A	1 byte (0 a 120 s)
+Duración fase B	1 byte (0 a 120 s)
+...
+...
+14(8) fin de bloque	1 byte
+Nº de plan	1 byte
+Nº de estructura	1 byte
+Nº de tabla de tiempos fases transitorias	1 byte
+Nº tabla de tiempos mínimos y de extensión	1 byte
+Desfase	2 bytes (0 a 256 s)
+Modo control actuado total	1 byte
+Duración fase A	1 byte (0 a 120 s)
+Duración fase B	1 byte (0 a 120 s)
+...
+etc.
+12(8) fin de bloque	1 byte
+
+El byte de modo de control actuado total representa el modo de funcionamiento a falta de demandas y se configura: 10000000 permanece en la última fase demandada
+1xxxxxxx número de fase a la que va
+
+
+
+
+Emergencia
+Número de tabla	10011000
+
+Nº de demanda que activa	1 byte
+Número de fase (emergencia)	1 byte
+* Duración de la fase	1 byte (0 a 120 s)
+Nº de transición de entrada	1 byte
+Nº de tabla de tiempos transición (f)	1 byte
+Tiempo a transición automática entrada	1 byte (0 a 120 s)
+Tiempo a transición automática entrada	1 byte (0 a 120 s)
+Nº de transición de salida	1 byte
+Nº de tabla de tiempos transición (f)	1 byte
+Tiempo a transición automática salida	1 byte (0 a 120 s)
+Tiempo a transición automática salida	1 byte (0 a 120 s)
+14(8) fin de bloque	1 byte
+Nº de demanda que activa	1 byte
+Número de fase (emergencia)	1 byte
+* Duración de la fase	1 byte (0 a 120 s)
+Nº de transición de entrada	1 byte
+Nº de tabla de tiempos transición (f)	1 byte
+Tiempo a transición automática entrada	1 byte (0 a 120 s)
+Tiempo a transición automática entrada	1 byte (0 a 120 s)
+Nº de transición de salida	1 byte
+Nº de tabla de tiempos transición (f)	1 byte
+Tiempo a transición automática salida	1 byte (0 a 120 s)
+Tiempo a transición automática salida	1 byte (0 a 120 s)
+...
+...
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+
+* Si la duración es cero, la fase dura mientras la demanda está accionada. Tabla de transiciones automáticas:
+Estado Final
+
+
+
+
+Tabla de puesta en marcha
+Número de tabla	10011001
+
+Posición 1 estado de grupos	N bytes (N nº grupos)
+15(8) fin de bloque	1 byte
+Posición 2 estado de grupos	N bytes (N nº grupos)
+15(8) fin de bloque	1 byte
+...
+...
+Posición M estado de grupos	N bytes (N nº grupos)
+14(8) fin de bloque	1 byte
+Duración posición 1	1 byte (0 a 120 s)
+Duración posición 2	1 byte (0 a 120 s)
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+
+Tabla de transiciones conflictivas
+Número de tabla	10011010
+
+Plan de partida	1 byte
+Plan destino	1 byte
+Nº de transición	1 byte
+Nº tabla de tiempos transición (f)	1 byte
+14(8) fin de bloque	1 byte
+Plan de partida	1 byte
+Plan destino	1 byte
+Nº de transición	1 byte
+Nº tabla de tiempos transición (f)	1 byte
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+Si el Plan de partida es cero no hay datos en esta tabla.
+
+Tablas horarios de planes
+Número de tabla	10011011
+
+Días de la semana (nivel de bit)	1 byte
+Hora	1 byte
+Minuto	1 byte
+*Acción	1 byte
+Nº de grupo/Nº de plan	1 byte
+14(8) fin de bloque	1 byte
+Días de la semana (nivel de bit)	1 byte
+Hora	1 byte
+Minuto	1 byte
+Acción	1 byte
+Nº de grupo/Nº de plan	1 byte
+14(8) fin de bloque	1 byte
+
+
+
+
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+
+(*) Acción (bit 6=0) selección de plan/modo funcionamiento En este caso el byte se configura:
+1  0  0  Y Y Y X	X
+–	modo de funcionamiento
+reservados
+modo:	00 tiempos fijos
+01 semiactuado
+10 actuado total Acción (bit 6=1) selección salida En este caso el byte se configura:
+1  1  X X X X X	X
+------  ------  -----
+–	–	estado salida rojo
+–	estado salida ámbar
+estado salida verde
+acción
+
+estados:	00 apagado
+01 encendido
+intermitente rápido
+intermitente lento
+
+Tabla de asignación de tiempos sobrantes
+
+Número de tabla	10011100
+Número de estructura	1 byte
+Nº fase receptora de tiempo sobrante	1 byte
+1ª fase que asigna tiempo sobrante	1 byte
+2ª fase que asigna tiempo sobrante	1 byte
+...
+...
+15(8) fin de bloque	1 byte
+Nº fase receptora de tiempo sobrante	1 byte
+...
+...
+14(8) fin de bloque	1 byte
+Número de estructura	1 byte
+Nº fase receptora de tiempo sobrante	1 byte
+1ª fase que asigna tiempo sobrante.	1 byte
+2ª fase que asigna tiempo sobrante.	1 byte
+...
+...
+15(8) fin de bloque	1 byte
+Nº fase receptora de tiempo sobrante	1 byte
+
+
+
+
+...
+14(8) fin de bloque	1 byte
+...
+...
+etc.
+12(8) fin de bloque	1 byte
+
+Directivas de información
+Plan en curso (excepción ya que es una directiva de control).
+
+Subregulador:	(0,1,2,3,4)
+Directiva:	10010001
+Esta directiva representa la pregunta de la orden: SELECCIÓN DE PLAN de directiva 11010001
+
+
+Nº de plan	1 byte /
+Hora inicio del plan	1 byte /
+Minuto inicio del plan	1 byte /
+Segundo inicio del plan	1 byte /
+Fase normal #0 (número de fase).	1 byte / respuesta
+Tiempo transcurrido de ciclo	2 bytes/
+
+Tiempo que resta de la fase	1byte/
+con regulador en modo A (en modo B no existe)
+Sin ajuste0/	0/
+Ajuste (+)	1/1 byte /
+Ajuste (-)	2/
+
+
+Estructura tiempo transcurrido de ciclo: 1er byte	1XXX XXXX
+
+
+
+(MSB)
+
+
+
+2do byte	1XXX XXXX
+
+(LSB)
+
+
+Regulador en modo B: Si no existe subregulador, no hay respuesta.
+
+Datos externos. Detectores físicos (presencia)
+
+3 bytes (información de detector bit a bit) 7 detectores por byte.
+
+
+
+
+
+
+1er byte	1XXX XXXX
+
+Detector físico 1
+
+
+
+2do byte 3er byte
+1XXX XXXX
+1XXX XXXX
+
+
+Detector físico 21
+
+
+No presencia	0
+Presencia	1
+Datos externos. Detector físico (contaje, ocupación) Subregulador:	(0)
+Directiva:	10110001
+N1 de detector	1 byte
+Respuesta:
+Subregulador:	(0)
+Directiva:	10110001
+Intensidad detector N	4 bytes
+Ocupación detector N (s)	4 bytes
+(*) Los 4 bytes de datos se configuran como dos bytes con un valor máximo de 65 536 con medio byte en cada byte.
+1er byte	1000 XXXX
+
+2do byte 3er byte 4to byte
+
+
+1000 XXXX
+1000 XXXX
+1000 XXXX
+MSB
+
+
+
+
+LSB
+
+
+El Regulador no pone a cero los contadores.
+Datos externos. Detectores físicos (contaje, ocupación) Subregulación:	(0)
+Directiva:	10110010
+Esta directiva pide la información de todos los detectores Respuesta:
+Subregulador:	(0)
+Directiva:	10110010
+Intensidad detector 1	4 bytes
+Ocupación detector 1 (s)	4 bytes
+Intensidad detector 2	4 bytes
+Ocupación detector 2 (s)	4 bytes
+...
+...
+Intensidad detector N	4 bytes
+Ocupación detector N (s).	4 bytes
+
+
+
+
+Siendo N: Nº de detectores estratégicos programado.
+Regulador en modo B. Si el Nº de detectores estratégicos programado es cero, no hay respuesta del Regulador.
+
+(*) Los 4 bytes de datos se configuran como dos bytes con un valor máximo de 65536 con medio byte en cada byte.
+
+1er byte	1000 XXXX
+MSB
+
+
+2do byte 3er byte 4to byte
+1000 XXXX
+1000 XXXX
+1000 XXXX
+
+
+
+LSB
+
+
+El Regulador no pone a cero los contadores.
+Datos externos. Detectores físicos (contaje, ocupación) Subregulación:	(0)
+Directiva:	10110011
+
+Esta directiva es la respuesta al DET.
+
+
+Intensidad detector 1	4 bytes
+Ocupación detector 1(s)	4 bytes
+Intensidad detector 2	4 bytes
+Ocupación detector 2 (s)	4 bytes
+......................................
+Intensidad detector N	4 bytes
+Ocupación detector N (s)	4 bytes
+
+Siendo N: Nº de detectores estratégicos programado.
+Regulador en modo B: Si el Nº de detectores estratégicos programado es cero, no hay respuesta del Regulador.
+
+(*) Los 4 bytes de datos se configuran como dos bytes con un valor máximo de 65536 con medio byte en cada byte.
+
+1er byte	1000 XXXX
+MSB
+
+
+2do byte 3er byte 4to byte
+1000 XXXX
+1000 XXXX
+1000 XXXX
+
+
+
+LSB
+
+
+
+
+El regulador pone a cero los contadores al recibir el DET.
+Alarmas Subregulador:	(0)
+Directiva:	10110100
+
+Respuesta:
+Subregulador: (0)
+Directiva:	10110100
+
+Incompatibilidad	1/
+Sincronización	2/
+Transmisión	4/
+Grupo averiado	8/1er byte de
+Lámpara fundida	16/respuesta
+Detector averiado	32/(se suman)
+Puerta abierta	64/
+Control manual	1/
+Autodiagnóstico	2/
+Reset	4/2ndo byte de
+Reloj sin inicializar	8/respuesta
+Temperatura	16/(se suman)
+Check de datos	32/
+Tensión fuera de límites	64/
+
+Grabación local	1/3er byte de
+Grabación por ordenador	2/respuesta
+Acceso incorrecto	4/(se suman)
+.	8 /
+.	16 /reservados
+.	32 /
+.	64 /
+
+Alarmas programadas (7 alarmas)	8 bits 4rto byte de respuesta
+Regulador en modo B: El mensaje de alarmas lo envía el Regulador automáticamente siempre que varíe su información.
+
+Lámpara fundida
+
+Número de grupo	1 byte
+Lámpara	1 byte
+Nº de grupo	1 byte
+Lámpara	1 byte
+...
+...
+etc.
+
+
+
+
+Lámpara de rojo	1/
+Lámpara de ámbar	2/(se suman)
+Lámpara de verde	4/
+Grupos averiados Subregulador:	(0)
+Directiva:	10110110 Respuesta:
+Subregulador:	(0)
+Directiva:	10110110
+Nº de grupo	1 byte
+Salida	1 byte
+...
+...
+etc.
+Salida de rojo	1/
+Salida de ámbar	2/(se suman)
+Salida de verde	4/
+Grupos que han dado incompatibilidad
+
+Nº de grupo	1 byte
+Nº de grupo incompatible anterior	1 byte
+Nº de grupo	1 byte
+Nº de grupo incompatible anterior	1 byte
+...
+...
+etc.
+Estado de grupo N
+
+
+estado:	1  X X X X X X	X
+–
+–	–	estado salida rojo
+–	estado salida ámbar
+estado salida verde
+
+intermitente sencillo (0)
+intermitente basculante (1)
+
+
+
+
+estados:	00 apagado
+01 encendido
+10 intermitente rápido
+11 intermitente sencillo
+
+Estado de todos los grupos (tráfico + mando directo)
+
+
+N bytes formateados según el apartado anterior 8.1.3 j. Desde el grupo 1 hasta el último grupo definido.
+
+
+Resumen de directivas
+
+Directivas de control
+Plan registrable	1X010000
+Selección de plan	1X010001
+Puesta en hora y fecha	1X010010
+Detectores en tiempo real	11010011 Estados.	1X010100
+Cambio de fase	11010101
+Mando directo de salidas	1X010110
+Mensaje alfanumérico canal XX.	1X011000
+Acceso a grabación de datos	1X011001
+Fin acceso a grabación de datos	1X011010
+Cruce en tiempo real	11011011
+Cancelación de tiempo real	11011100
+Borrado de alarmas	11011101
+
+Tablas
+Directiva general:	1X10000 Byte Nº de tabla.
+Tablas generales:
+Grupos de tráfico y mando directo	10000001
+Tabla de detectores físicos	10000010
+Tabla de detectores lógicos	10000011
+Tabla de demandas	10000100
+Tabla de incompatibilidades	10000101
+Tabla de días especiales	10000110
+Tabla de intermitencias	10000111
+Tabla de modo de funcionamiento	10001000
+Tabla tratamiento de alarmas	10001001
+
+
+
+
+Tablas de subreguladores:
+Tabla de grupos(fases estables)	 10001111 Tabla de grupos (posiciones de fases transitorias)	10010000 Tabla de posiciones-fases transitorias	 10010001 Tabla de estructuras	 10010010
+Tabla de acciones-demandas	10010011
+Tabla transitorios-tabla tiempos	10010100
+Tablas de tiempos de fases transitorias	10010101
+Tablas de tiempos mínimos y extensiones	10010110 Tablas de planes	 10010111
+Tabla de emergencia	10011000
+Tabla de puesta en marcha	10011001
+Tabla de transiciones conflictivas	10011010 Tabla horaria de planes	 10011011
+Tabla de asignación de tiempos sobrantes	10011100
+Tablas especiales de cada fabricante	10100000 y siguientes
+(microregulación)
+
+Directivas de información
+Detectores (presencia)	10110000
+Detector (contaje y ocupación)	10110001
+Detectores (contaje y ocupación)	10110010
+Detectores, respuesta al DET	10110011 Alarmas	10110100
+Lámpara fundida	10110101
+Alarmas de salidas	10110110
+Alarmas de incompatibilidad	10110111
+Estado de grupo N	10111000
+Estado de todos los grupos	10111001
+
+Bytes de control punto a punto
+
+
+
+
+
+ANEXO A
+
+
+Objeto
+El objeto de este anexo es servir de ampliación funcional al Informe AENOR de protocolo de comunicaciones de reguladores de tráfico PNE 135401-4 IN (M).
+
+Se hace referencia también a la Norma de características funcionales de reguladores de tráfico UNE 135401-1 EX.
+
+
+Conceptos funcionales
+
+Subreguladores
+Un regulador puede dividirse en subreguladores independientes (hasta 4), de forma que cada subregulador podrá funcio- nar de forma independiente. Esto supone que ciertos parámetros serán generales para el regulador, mientras que otros serán específicos para cada subregulador.
+
+Grupos de tráfico y de mando directo
+Los grupos de tráfico coinciden con la definición de grupo semafórico dada en la Norma UNE 135 401-1.
+
+Los grupos de mando directo (véase la Norma UNE 135401-1, apartado 6.6.2) no están definidos en las fases, pudién- dose gobernar de las siguientes formas:
+Forzados desde elementos jerárquicamente superiores [véase el apartado 8.1.1 h)].
+Establecer su comportamiento por una tabla horaria [véase el apartado 8.1.2.2 m)].
+Actuarlos por demandas (condiciones sobre detectores) [véase el apartado 8.1.2.2 e)].
+Los grupos de mando directo tendrán que ser asignados a números posteriores al último grupo de tráfico empleado [véase el apartado 8.1.2.1 a)].
+
+Estado del grupo De tráfico
+Representación del grupo en un instante dado. Los estados mínimos que deben contemplarse son [véase el aparta- do 8.1.2.2 b)].
+
+
+
+
+
+Las intermitencias, tanto rápida como lenta, deben ser programables [véase el apartado 8.1.2.1 g)] indicando para cada una las décimas de estado ON y OFF.
+
+De mando directo
+El estado en este caso se describe salida a salida tal como se explica en la directiva de mando directo de salidas [véase el apartado 8.1.1 h)].
+
+Fases estables. Fases transitorias o posiciones
+Fase estable coincide con el concepto dado en la Norma UNE 135401-1, apartado 6.4.
+
+Las fases transitorias también coinciden con el concepto del mismo nombre en la Norma UNE 135401-1, apartado 6.4 y son también llamadas posiciones.
+Tanto fases estables como posiciones se establecen definiendo el estado de cada grupo de tráfico [véanse los aparta- dos 8.1.2.2 a) y b)].
+
+Transiciones y estructura
+El concepto de transición [véase el apartado 8.1.2.2 c)], coincide con el concepto de transitorio dado en la Norma UNE 135401-1, apartado 6.4.3.
+Cada transitorio esta formado por una o varias posiciones.
+
+Las posiciones se programan en la tabla 16 [véase el apartado 8.1.2.2 b)], definiéndose en ella, para cada posición, el estado de todos los grupos.
+La asignación de posiciones a transitorios se programa en la tabla 17 [véase el apartado 8.1.2.2 c)]. Para cada transitorio se definen las posiciones que lo forman.
+
+Los tiempos de los transitorios se programan de la siguiente forma:
+
+en la tabla 20 [véase el apartado 8.1.2.2 f)] se realiza la asignación de los transitorios a la tabla de tiempos.
+
+en la tabla 21 [véase el apartado 8.1.2.2 g)] se programan para cada tabla de tiempos, los tiempos de las posiciones de cada transitorio.
+El concepto de estructura es el indicado en la Norma UNE 135401-1, apartados 3.3 y 6.4.3. Se decide que transición debe ejecutarse entre cada par de fases al programar la estructura [véase el apartado 8.1.2.2 d)].
+
+Pueden existir varias estructuras de funcionamiento.
+
+Planes, tipos de fases y métodos de control Concepto de plan
+El plan [véase el apartado 8.1.2.2 i)] es compatible con la definición genérica dada en la Norma UNE 135401-1, apartado 3.6 y se desarrolla con los siguientes parámetros:
+La estructura de funcionamiento.
+Los tiempos asignados a las transiciones.
+Las duraciones máximas de las fases.
+Desfase
+
+
+
+
+Tiempos mínimos y extensiones de las fases
+Sistema de actuación total.
+
+Tipos de fases
+Las fases se clasifican según los siguientes criterios:
+Principal:	Es la primera fase que se define en la estructura para distinguirla del resto de las fases que pueden intervenir en la misma.
+
+En semiactuado, es la única fase cuya aparición no depende de las demandas programadas. En actuado, es la fase de entrada y salida del funcionamiento actuado.
+Secundarias:	Todas las fases definidas en la estructura excepto la primera que es la principal. A tiempos fijos:	Todas las fases que se definen en el primer bloque de la estructura.
+Son las que se utilizan para determinar la duración del ciclo en tiempos fijos y en semiactuado. Son las únicas que aparecen en el funcionamiento a tiempos fijos.
+Actuadas:	Todas las fases definidas en el segundo bloque de la estructura.
+En tiempos fijos no aparecen en el ciclo.
+
+En actuado tienen consideración de actuadas todas las fases definidas en la estructura.
+
+En semiactuado tienen consideración de actuadas todas las fases excepto la fase principal que aparece siempre, aunque puede actuarse sobre ella con la asociación de una acción de exten- sión.
+Una fase actuada solo puede aparecer si tiene asociada una acción de asignación de fase.
+
+En un plan cada fase tiene un tiempo máximo asignado fase a fase en el propio plan. El conjunto de fases de la estruc- tura sigue una tabla de tiempos mínimos y tiempos de extensión [véase el apartado 8.1.2.2 h)]. La tabla a seguir se indi- ca en el plan. Los conceptos de tiempos mínimos, máximos y de extensión se encuentran en la Norma UNE 135401-1, apartado 5.2.3.
+
+En la tabla de estructuras [véase el apartado 8.1.2.2 d)] , se indican éstas divididas en dos bloques tal como se ha indicado en la clasificación anterior.
+
+Métodos de control
+El regulador podrá funcionar en uno o más de los siguientes métodos de control y podrá cambiar entre ellos, de acuerdo a las entradas internas o externas.
+Tiempos fijos.
+
+Actuado.
+Semiactuado o actuado sincronizado.
+Manual.
+
+Remoto.
+
+
+
+
+En caso de que el método de control sea actuado sincronizado y se den tiempos sobrantes, estos son distribuidos según se indica en la Norma UNE 135401-1, apartado 5.2.3. La asignación de tiempos entre fases se realiza en el aparta- do 8.1.2.2 n).
+Caso de modo de control actuado y en ausencia de demanda se puede elegir si queda en la última fase o se va a una preestablecida en función de un parámetro indicado en el propio plan.
+
+Planes almacenados y plan registrable
+Los planes que se pueden almacenar en el regulador véase el apartado 8.1.2.2 i) serán como mínimo 8 más el plan 0 (registrable) que puede grabarse desde el ordenador del sistema centralizado véase el apartado 8.1.1 a).
+
+Selección del plan
+El plan en el que en un momento dado funciona el regulador puede ser :
+
+Por el método de control horario según se define en la Norma UNE 135401-1, apartado 5.2.5. La tabla horaria [véase el apartado 8.1.2.2 m)] describe los cambios a hacer indicando la hora y el minuto del cambio y el día de la semana. Ciertas fechas pueden tener un tratamiento especial, estos cambios se indican en la tabla de días especiales [véase el apartado 8.1.2.1 f)].
+
+Seleccionado desde un sistema centralizado.
+
+Seleccionado de forma externa por las entradas dedicadas a este sistema.
+En el primer caso en la propia tabla horaria se selecciona el plan y el método de control (tiempos fijos, semiactuado, o actuado).
+
+En el segundo caso existe una directiva para selección de plan [véase el apartado 8.1.1 b)] y una para el método de control [véase el apartado 8.1.1 f)].
+En el tercer caso el método de control es el indicado en la tabla de modo de funcionamiento [véase el apartado 8.1.2.1 h)].
+
+Conocimiento del plan desde un nivel superior
+El plan en curso y el momento del desarrollo del mismo puede conocerse desde niveles superiores [véase el aparta- do 8.1.3 a)].
+
+Transiciones conflictivas entre planes
+La transición entre plan y plan siempre se establece al finalizar un ciclo.
+Las transiciones conflictivas se programan, si se precisa, para evitar problemas de conflicto de colores en algún grupo de tráfico en algunos cambios de plan.
+
+El regulador, si se ha definido, realiza la transición programada cuando finaliza el plan actual (plan saliente) y antes de iniciar el nuevo plan (plan entrante).
+En esta tabla se define la transición a usar y la tabla de tiempos para la transición. [véase el apartado 8.1.2.2 l)].
+
+Detectores y demandas Detectores físicos
+Los detectores físicos son entradas todo o nada del regulador. Pueden ser estratégicos, si pueden dar contajes (intensi- dad y ocupación), o tácticos si sólo pueden provocar actuaciones.
+
+
+
+
+Existe una tabla [véase el apartado 8.1.2.1 b)] que define el número de detectores estratégicos, el primer detector táctico, y el número de detectores tácticos. El número total de detectores físicos que puede tener un regulador es 21.
+Desde un sistema de centralización se puede conocer en tiempo real el estado (ON, OFF) de un número de detectores preseleccionados [véanse los apartados 8.1.1 d) y e)]. También es posible conocer el estado de detectores por una con- sulta en cierto momento [véase el apartado 8.1.3 b)].
+
+Los detectores estratégicos pueden ser consultados desde un sistema de control [véanse los apartados 8.1.3 c), d) y e)].
+
+Detectores lógicos
+Los detectores lógicos son los existentes desde un punto de vista funcional y se derivan de los anteriores, así como de otras condiciones [véase el apartado 8.1.2.1 c)].
+Un detector lógico está basado en un detector táctico, sobre dos (véase más adelante el de velocidad), o en el cumpli- miento de ciertas condiciones.
+
+Se denomina lógico porque su valor será 0 (falso: no se ha detectado la condición) ó 1 (cierto: se ha detectado la condición). Pueden ser:
+
+
+
+Además puede considerarse que la señal es normal o complementada.
+
+Demandas
+Se denomina demanda a una condición lógica sobre detectores lógicos con la que podemos realizar funciones diversas. Están demandas se diseñan en su correspondiente tabla [véase el apartado 8.1.2.1 d)].
+Como en el regulador pueden existir hasta 21 detectores lógicos, los términos y máscaras son de tres bytes.
+
+El estado R es el valor cierto o falso aplicable al detector lógico. Este valor será diferente según las llamada máscaras de actuación y de tipo de memoria.
+La máscara de actuación indica por cada detector de si su estado cierto tiene que estar en la actualidad (en el momento de chequear la demanda: señal directa), o si es cierto si se ha detectado con anterioridad aunque en el momento actual no sea así (señal memorizada).
+
+Asignación de acciones a demandas
+Las demandas ocasionan ciertas acciones [véase el apartado 8.1.2.2 e)]. Los tipos de acciones pueden ser:
+Asignar fases en cruces actuados y semiactuados.
+Extender fases en cruces actuados y semiactuados.
+Activar grupos de mando directo en función de una fase.
+Generar alarmas.
+Activar grupos de mando directo en función de grupos de tráfico.
+
+
+
+
+En la tabla de asignación de acciones a demandas aparecen los conceptos de forma de cancelación y máscara de cance- lación que se verán seguidamente:
+
+Demandas de asignación de fases
+Se evalúan en el momento en que podría empezar la fase y se cancelan tras la evaluación positiva y, dependiendo de la forma de cancelación, al entrar o al acabar la fase.
+Los detectores implicados en la cancelación son los indicados en la máscara de cancelación.
+
+Demandas de extensión de fuente
+Estas demandas se evalúan en el momento en que podría empezar cada uno de los tiempos de extensión.
+Las demandas son canceladas una vez comenzada la fase y tras cada tiempo de extensión comenzado y totalmente satisfecho.
+
+Si la forma de cancelación es al final de la fase una demanda de extensión no satisfecha será también cancelada. Si la forma de cancelación es al principio de la fase la demanda podría quedar pendiente para el ciclo siguiente, produciendo una asignación de la fase.
+Los detectores implicados en la cancelación son los indicados en la máscara de cancelación.
+
+Activación de grupos de mando directo por fases
+Estas demandas accionan grupos de mando directo poniendo en ese grupo el estado indicado en la demanda. Cada acción de este tipo tiene una fase de referencia. El grupo puede activarse en la fase o fuera de la fase. La demanda se borra al principio o al final de la citada fase.
+Alarmas programadas por demandas
+Su estado se tendrá en la palabra de alarmas (véase alarmas). Puede programarse que se borren después de ser trans- mitida la palabra de estado al ordenador.
+
+Activación de grupos de mando directo por grupos de tráfico
+Estas demandas accionan grupos de mando directo poniendo en ese grupo el estado indicado en la demanda.
+
+Cada acción de este tipo tiene un estado de un grupo semafórico como referencia. El grupo de mando directo puede activarse en ese estado del grupo semafórico, o fuera de ese estado.
+La demanda se borra al principio o al final del estado del citado grupo semafórico.
+
+Entrada a modo control
+La secuencia de entrada al modo de control que se define en la Norma UNE 135401-1, apartado 5.1.5.1, se desarrolla en la tabla dada en el apartado 8.1.2.2 k).
+
+Secuencia de emergencia
+La secuencia de emergencia permite el cambio del estado en que se encuentren los grupos de tráfico, una vez que el equipo se halla en una fase estable y haya realizado su tiempo mínimo, a una configuración previamente establecida (fa- se de emergencia), que permanecerá mientras exista el accionamiento (duración 0) o durante un tiempo predeterminado [véase el apartado 8.1.2.2 j)].
+
+
+
+
+La secuencia de emergencia es la siguiente:
+
+Dos transiciones automáticas de entrada donde se tiene en cuenta el estado del grupo donde se está y al que se quiere llegar a final de estas dos transiciones automáticas. El tiempo de cada una de las transiciones es programable.
+
+Un transitorio de entrada escogido de la tabla de transitorios con su correspondiente tabla de tiempos.
+
+La fase de emergencia de la tabla de fases.
+
+Un transitorio de salida escogido de la tabla de transitorios con su correspondiente tabla de tiempos.
+
+Dos transiciones automáticas de salida donde se tiene en cuenta el estado del grupo donde se está y al que se quiere llegar a final de estas dos transiciones automáticas. El tiempo de cada una de las transiciones es programable.
+
+Las transiciones automáticas se realizan según la tabla incluida en la referencia. La secuencia de emergencia es activada por una determinada demanda.
+Cambios de fase externos. Órdenes o impulsos de cambio de fase
+Es posible que, fijado un plan, haya una fuente externa que indique al regulador cuando ha de cambiar la fase. En este caso el regulador evidentemente no puede conservar el ciclo. Estas órdenes de cambio de fase se realizan con la directiva [véase el apartado 8.1.1 g)].
+
+Información en tiempo real sobre estados de grupos
+El protocolo tiene las siguientes prestaciones para el conocimiento en tiempo real de los estados de los grupos:
+
+Cruce en tiempo real/fuera de tiempo real: el regulador indica el estado de los grupos en cada cambio que se produce [véanse los apartados 8.1.1 l) y m)].
+
+Información espontánea sobre estados de grupos [véase el apartado 8.1.3 k)].
+
+Estados
+Los estados que se pueden ordenar a un regulador y de los que informa el mismo espontáneamente se dan con la directiva incluida en el apartado 8.1.1 f). Muchos de estos estados no son excluyentes entre sí, pudiendo ser ordenados de la siguiente forma:
+
+Respecto al estado de representación
+Se indican los estados apagado, intermitente, colores. Evidentemente estos son excluyentes entre sí.
+
+Respecto a la forma en que se ha obtenido el plan en curso
+Considerando la forma de determinación del plan de tráfico, el regulador puede funcionar en los siguientes modos:
+
+Control local (planes horarios). El cambio de plan es función de la programación de una tabla horaria.
+Control externo de planes. El equipo funciona con el plan que recibe por bornas.
+
+Plan seleccionado por ordenador. El ordenador envía al equipo la selección de plan.
+Estos estados son incompatibles entre sí.
+
+
+
+
+Respecto a la forma de sincronización
+El centro de control selecciona el tipo de sincronismo del subregulador entre los siguientes:
+
+Coordinado por señal externa (por bornas).
+
+Coordinado por reloj interno (por tabla horaria).
+
+Coordinado por ordenador (mensaje de selección de plan).
+
+Respecto al método de control
+El plan puede estar ejecutándose en una de las siguientes formas:
+
+A tiempos fijos.
+
+Semiactuado.
+
+Actuado.
+
+Respecto a la habilitación de fases de emergencia
+El mecanismo de fase de emergencia puede ser habilitado/deshabilitado. Respecto a la habilitación de los grupos de mando directo por el ordenador El ordenador habilita y deshabilita los grupos de mando directo.
+Otros estados
+Control externo por ICF: Corresponde a la habilitación del nivel central por bornas, en caso de que el control sea centralizado.
+
+Control centralizado: Si el bit es cero el equipo está en autónomo, si el bit es uno el equipo está controlado por central o por ordenador.
+
+Control manual: Corresponde al sistema de mando guardia. También se aplica a los cambios de fase indicados desde el ordenador. El bit de control manual a uno, informa que el regulador se encuentra en mando manual, ya sea de llave, ICF o por ordenador.
+
+Alarmas
+Las alarmas son compatibles con el tratamiento de fallos mayores y menores definidos en la Norma UNE 135401-1, capítulo 8].
+
+Las alarmas completas gestionadas se dan en la directiva [véase el apartado 8.1.3 f)] y pueden ser fallos mayores, menores o informativas, según se indica en una tabla más abajo.
+La tabla definida en el apartado 8.1.2.1 i) informa de las alarmas que pueden ser consideradas fallos menores (ya que puede programarse su comportamiento).
+
+Las alarmas de incompatibilidad véase el apartado 8.1.2.1 e) y de autodiagnóstico deben ser considerados fallos mayo- res por la Norma UNE 135401-1, apartado 8.1. El resto son informativas.
+
+
+
+
+Clasificación de las alarmas
+
+Las alarmas existentes se marcan a 1 ó a 0 en el conjunto de bytes definido en el apartado 8.1.3 f), esta información está disponible para el operador local, y puede ser consultada desde un ordenador. El protocolo también admite una emisión espontánea del regulador al detectarse un cambio en esta información.
+
+El equipo elabora internamente una palabra de alarmas para informar de los fallos o anomalías que se producen. La palabra de alarmas se actualiza cuando varía alguno de los bits de los 4 bytes que la componen.
+La palabra de alarmas puede consultarse a pie de equipo con el teclado, mediante el código correspondiente y también por la línea local de grabación de tablas.
+En equipos centralizados, el regulador envía la palabra de alarmas por la línea de ordenador, siempre que se produce una variación en su composición y también por petición del centro de control.
+
+Las alarmas se generan por autocontrol, se activan cuando se produce la causa que las provoca. La desactivación depende de la alarma y se produce por uno de los siguientes medios:
+Autocontrol (desaparece cuando cesa la causa que la produce).
+
+La orden de borrado (si es alarma memorizada).
+
+Según el tratamiento asignado en la tabla de tratamientos de alarmas.
+
+
+
+
+Las características que pueden darse al tratamiento de una alarma son:
+
+A qué estado se pasa: tiempo fijos, apagado o intermitente.
+
+Si la alarma se guarda o se transmite.
+Ciertas alarmas se puede programar su comportamiento por tipo de salida del grupo (rojo, ámbar, verde). Esto es debido a que en el tratamiento de seguridad del regulador no tiene la misma importancia cada foco. De esta forma vemos en el apartado 8.1.2.1 i) que las alarmas de grupos y de lámparas fundidas se tratan de forma diferente salida a salida.
+
+Se debe considerar que hay ciertas alarmas que necesitan una explicación adicional. Las alarmas de lámpara fundida o la alarma de grupo puede darse en varios grupos y varias salidas simultáneamente. Esta información puede ser obtenida por un operador local, o por las directiva [véanse los apartados 8.1.3 g) y h)]. La alarma de incompatibilidad puede darse entre varios grupos simultáneamente. Esta información puede ser obtenida por un operador local, o por la directiva [véase el apartado 8.1.3 i)].
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Dirección  C Génova, 6	Teléfono 91 432 60 00	Fax 91 310 40 32
+28004 MADRID-España

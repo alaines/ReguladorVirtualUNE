@@ -1,0 +1,57 @@
+======================================================================
+ANÁLISIS DETALLADO DEL REGULADOR REAL
+======================================================================
+
+CÓDIGOS DE LA CENTRAL:
+   0x91: Sincronización                           -  4677 veces
+   0xB7: Incompatibilidades                       -   793 veces
+   0xB4: Estado regulador/Alarmas                 -   646 veces
+   0xB5: Parámetros configuración                 -   646 veces
+   0xB6: Tablas programación                      -   646 veces
+   0x94: Datos de tráfico                         -   459 veces
+   0xD2: Desconocido                              -    30 veces
+   0xD1: Selección plan                           -    15 veces
+   0x92: Desconocido                              -    11 veces
+   0xD4: Desconocido                              -     4 veces
+   0xB3: Desconocido                              -     2 veces
+
+
+CÓDIGOS DEL REGULADOR:
+   0x91: Sincronización                           -  4771 veces
+   0xB9: Estado grupos                            -  3248 veces
+   0xB3: Desconocido                              -   768 veces
+   0xB7: Incompatibilidades                       -   725 veces
+   0xB4: Estado regulador/Alarmas                 -   641 veces
+   0xB5: Parámetros configuración                 -   641 veces
+   0xB6: Tablas programación                      -   641 veces
+   0x94: Datos de tráfico                         -   441 veces
+   0xD2: Desconocido                              -    26 veces
+   0xD1: Selección plan                           -    21 veces
+   0x92: Desconocido                              -    11 veces
+
+
+PLANES: [129, 130, 134, 135, 136]
+CICLOS: [128, 129, 130]
+
+
+ESTADO DE GRUPOS (muestra):
+2026-01-14 16:59:53 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 16:59:56 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:00:02 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Verde, G3:Apagado, G4:Apagado, G5:Ámbar, G6:Apagado
+2026-01-14 17:00:35 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Verde, G3:Apagado, G4:Apagado, G5:Ámbar, G6:Apagado
+2026-01-14 17:00:38 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Verde, G4:Apagado, G5:Ámbar, G6:Apagado
+2026-01-14 17:00:38 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:00:38 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:00:39 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Verde
+2026-01-14 17:00:39 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Verde
+2026-01-14 17:01:36 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:01:36 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:01:39 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:01:39 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:01:41 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Verde, G3:Apagado, G4:Apagado, G5:Ámbar, G6:Apagado
+2026-01-14 17:01:41 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Verde, G3:Apagado, G4:Apagado, G5:Ámbar, G6:Apagado
+2026-01-14 17:02:37 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Verde, G4:Apagado, G5:Ámbar, G6:Apagado
+2026-01-14 17:02:40 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:02:42 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Verde
+2026-01-14 17:03:54 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado
+2026-01-14 17:03:57 | DEBUG    |   R→C | Grupos: G1:Ámbar, G2:Apagado, G3:Apagado, G4:Verde, G5:Ámbar, G6:Apagado

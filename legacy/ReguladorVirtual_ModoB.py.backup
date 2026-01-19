@@ -1,0 +1,561 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+REGULADOR VIRTUAL TIPO M - MODO B
+Basado en norma UNE 135401-4:2003
+
+Este regulador se conecta a una central de tráfico en puerto 19000
+Modo B: Comunicación asíncrona con envío espontáneo de datos al detectar cambios
+"""
+
+import socket
+import threading
+import time
+import random
+from datetime import datetime
+
+# ============================================================================
+# CONFIGURACIÓN DEL REGULADOR
+# ============================================================================
+
+class ConfigRegulador:
+    """Configuración del regulador virtual"""
+    
+    # Conexión (SERVIDOR - Escucha conexiones de la central)
+    ESCUCHAR_IP = "0.0.0.0"         # Escucha en todas las interfaces
+    ESCUCHAR_PORT = 19000           # Puerto donde escucha el regulador
+    
+    # Identificación
+    SUBREGULADOR_ID = 1             # ID de este subregulador (1-4)
+    
+    # Características
+    NUM_GRUPOS = 8                  # Grupos semafóricos
+    NUM_DETECTORES = 4              # Detectores físicos
+    NUM_PLANES = 4                  # Planes almacenados
+    
+    # Parámetros de operación
+    MODO_OPERACION = "B"            # Modo B: asíncrono
+    TIEMPO_CICLO = 70               # Segundos
+    
+    # Timings
+    TIMEOUT_CONEXION = 5            # Timeout para conexión
+    INTERVALO_ESTADO = 10           # Envío de estado cada 10s si no hay ACK
+    TIMEOUT_ACK = 10                # Espera ACK antes de reenviar
+    MAX_REINTENTOS = 3              # Reintentos antes de cerrar sesión
+
+
+# ============================================================================
+# CONSTANTES DEL PROTOCOLO
+# ============================================================================
+
+class ProtocoloUNE:
+    """Constantes del protocolo UNE 135401-4"""
+    
+    # Caracteres de control
+    STX = b'\x02'   # Inicio de transmisión
+    ETX = b'\x03'   # Fin de transmisión
+    EOT = b'\x04'   # Fin de transmisión parcial
+    ACK = b'\x06'   # Acuse de recibo positivo
+    NACK = b'\x15'  # Acuse de recibo negativo
+    DC1 = b'\x11'   # Comunicaciones ON
+    DC3 = b'\x13'   # Comunicaciones OFF
+    
+    # Mensajes especiales
+    DET = 0x20      # Petición de detectores
+    TRCAM = 0x30    # Estado detectores en tiempo real
+    HTR = 0x33      # Hora en tiempo real
+    PRH = 0x40      # Petición de hora
+    
+    # Directivas de control (envío)
+    PLAN_REGISTRABLE = 0x50     # 1X010000
+    SELECCION_PLAN = 0x51       # 1X010001
+    PUESTA_HORA = 0x52          # 1X010010
+    DET_TIEMPO_REAL = 0xD3      # 11010011
+    ESTADOS = 0x54              # 1X010100
+    CAMBIO_FASE = 0xD5          # 11010101
+    MANDO_DIRECTO = 0x56        # 1X010110
+    CRUCE_TIEMPO_REAL = 0xDB    # 11011011
+    CANCELAR_TIEMPO_REAL = 0xDC # 11011100
+    BORRADO_ALARMAS = 0xDD      # 11011101
+    
+    # Directivas de información (pregunta)
+    PLAN_EN_CURSO = 0xC9        # 10010001 (pregunta)
+    DET_FISICOS_PRESENCIA = 0xB0 # 10110000
+    DET_FISICO_CONTAJE = 0xB1    # 10110001
+    TODOS_DET_CONTAJE = 0xB2     # 10110010
+    ALARMAS = 0xB4               # 10110100
+    LAMPARAS_FUNDIDAS = 0xB5     # 10110101
+    GRUPOS_AVERIADOS = 0xB6      # 10110110
+    
+    # Respuestas (envío información)
+    PLAN_EN_CURSO_RESP = 0xC9   # 11010001 (envío)
+    ESTADO_RESP = 0xD4          # 11010100 (envío)
+
+
+# ============================================================================
+# ESTADO DEL REGULADOR
+# ============================================================================
+
+class EstadoRegulador:
+    """Mantiene el estado actual del regulador"""
+    
+    def __init__(self):
+        # Plan actual
+        self.plan_actual = 2
+        self.hora_inicio_plan = datetime.now()
+        self.fase_actual = 1
+        self.tiempo_transcurrido_ciclo = 0
+        self.tiempo_restante_fase = 35
+        
+        # Detectores (simula estados aleatorios)
+        self.detectores = [0, 0, 0, 0]  # 0=inactivo, 1=activo
+        self.contador_detectores = [0, 0, 0, 0]
+        self.ocupacion_detectores = [0, 0, 0, 0]
+        
+        # Alarmas (4 bytes según norma)
+        self.alarmas = [0x00, 0x00, 0x00, 0x00]
+        
+        # Estados
+        self.estado_operacion = 2  # 0=Apagado, 1=Intermitente, 2=Normal
+        self.modo_control = 0      # 0=Local horario, 1=Externo, 4=Centralizado
+        self.modo_coordinacion = 1 # 1=Reloj interno
+        self.modo_funcionamiento = 0 # 0=Tiempos fijos, 1=Semiactuado, 2=Actuado
+        
+        # Control de tiempo real
+        self.tiempo_real_detectores = False
+        self.tiempo_real_cruce = False
+        
+        # Planes configurados
+        self.planes = {
+            1: {"ciclo": 50, "grupos": 4, "fases": [22, 20], "estructura": 1, "transitorio": 8, "desfase": 0},
+            2: {"ciclo": 70, "grupos": 4, "fases": [32, 30], "estructura": 1, "transitorio": 8, "desfase": 0},
+            3: {"ciclo": 90, "grupos": 4, "fases": [50, 32], "estructura": 1, "transitorio": 8, "desfase": 0},
+            4: {"ciclo": 60, "grupos": 4, "fases": [28, 28], "estructura": 1, "transitorio": 8, "desfase": 0}
+        }
+    
+    def obtener_plan_actual(self):
+        """Retorna la configuración del plan actual"""
+        return self.planes.get(self.plan_actual, self.planes[2])
+    
+    def simular_cambio_detectores(self):
+        """Simula cambios aleatorios en detectores"""
+        cambio = False
+        for i in range(len(self.detectores)):
+            if random.random() < 0.1:  # 10% probabilidad de cambio
+                self.detectores[i] = 1 - self.detectores[i]
+                if self.detectores[i] == 1:
+                    self.contador_detectores[i] += 1
+                cambio = True
+        return cambio
+    
+    def actualizar_ciclo(self):
+        """Actualiza el tiempo de ciclo"""
+        plan = self.obtener_plan_actual()
+        self.tiempo_transcurrido_ciclo = (self.tiempo_transcurrido_ciclo + 1) % plan["ciclo"]
+        if self.tiempo_transcurrido_ciclo < plan["fases"][0]:
+            self.fase_actual = 1
+            self.tiempo_restante_fase = plan["fases"][0] - self.tiempo_transcurrido_ciclo
+        else:
+            self.fase_actual = 2
+            self.tiempo_restante_fase = plan["ciclo"] - self.tiempo_transcurrido_ciclo
+
+
+# ============================================================================
+# UTILIDADES DEL PROTOCOLO
+# ============================================================================
+
+def calcular_checksum(datos):
+    """
+    Calcula el checksum según norma UNE 135401-4
+    XOR de todos los bytes, solo 7 bits LSB de cada byte
+    """
+    checksum = 0
+    for byte in datos:
+        checksum ^= (byte & 0x7F)
+    return bytes([checksum & 0x7F])
+
+
+def construir_mensaje(subregulador, codigo, datos=b''):
+    """
+    Construye un mensaje completo según la norma
+    [STX] [SUBREGULADOR] [CÓDIGO] [DATOS...] [CHECKSUM] [ETX]
+    """
+    cuerpo = bytes([subregulador, codigo]) + datos
+    checksum = calcular_checksum(cuerpo)
+    return ProtocoloUNE.STX + cuerpo + checksum + ProtocoloUNE.ETX
+
+
+def to_bcd(value):
+    """Convierte un número decimal a BCD"""
+    return (value // 10) << 4 | (value % 10)
+
+
+# ============================================================================
+# GENERADORES DE RESPUESTAS
+# ============================================================================
+
+class GeneradorRespuestas:
+    """Genera las respuestas del regulador según la norma"""
+    
+    @staticmethod
+    def respuesta_plan_en_curso(estado, subregulador):
+        """
+        Respuesta al código 0xC9 - Plan en curso
+        Formato según 8.1.3.a de la norma
+        """
+        plan = estado.obtener_plan_actual()
+        hora_inicio = estado.hora_inicio_plan
+        
+        # Estructura tiempo transcurrido (2 bytes, MSB y LSB)
+        tiempo_trans_msb = (estado.tiempo_transcurrido_ciclo >> 7) & 0x7F
+        tiempo_trans_lsb = estado.tiempo_transcurrido_ciclo & 0x7F
+        
+        datos = bytes([
+            estado.plan_actual,
+            hora_inicio.hour,
+            hora_inicio.minute,
+            hora_inicio.second,
+            estado.fase_actual,
+            0x80 | tiempo_trans_msb,  # Bit 7 = 1 según norma
+            0x80 | tiempo_trans_lsb,
+            estado.tiempo_restante_fase & 0x7F,
+            0  # Sin ajuste
+        ])
+        
+        return construir_mensaje(subregulador, ProtocoloUNE.PLAN_EN_CURSO_RESP, datos)
+    
+    @staticmethod
+    def respuesta_detectores_presencia(estado, subregulador):
+        """
+        Respuesta al código 0xB0 - Detectores físicos (presencia)
+        3 bytes con info bit a bit (7 detectores por byte)
+        """
+        # Empaquetar estado de detectores en bytes
+        byte1 = 0x80  # Bit 7 = 1 según norma
+        for i in range(min(7, len(estado.detectores))):
+            if i < len(estado.detectores) and estado.detectores[i]:
+                byte1 |= (1 << i)
+        
+        datos = bytes([byte1, 0x80, 0x80])  # 3 bytes según norma
+        return construir_mensaje(subregulador, ProtocoloUNE.DET_FISICOS_PRESENCIA, datos)
+    
+    @staticmethod
+    def respuesta_alarmas(estado, subregulador):
+        """
+        Respuesta al código 0xB4 - Alarmas
+        4 bytes según apartado 8.1.3.f
+        """
+        datos = bytes(estado.alarmas)
+        return construir_mensaje(subregulador, ProtocoloUNE.ALARMAS, datos)
+    
+    @staticmethod
+    def respuesta_estado(estado, subregulador):
+        """
+        Respuesta al código 0xD4 - Estado del regulador
+        Envío automático en Modo B cuando cambia el estado
+        """
+        datos = bytes([
+            estado.estado_operacion,
+            estado.modo_control,
+            estado.modo_coordinacion,
+            estado.modo_funcionamiento
+        ])
+        return construir_mensaje(subregulador, ProtocoloUNE.ESTADO_RESP, datos)
+    
+    @staticmethod
+    def respuesta_trcam(estado):
+        """
+        TRCAM - Estado de detectores en tiempo real
+        Mensaje especial de 1 byte con estado de 4 detectores
+        """
+        # Codificar estado de 4 detectores en 4 bits
+        estado_det = 0x30  # Código TRCAM base (0011 0000)
+        for i in range(min(4, len(estado.detectores))):
+            if estado.detectores[i]:
+                estado_det |= (1 << i)
+        
+        return bytes([estado_det])
+
+
+# ============================================================================
+# REGULADOR VIRTUAL
+# ============================================================================
+
+class ReguladorVirtual:
+    """Regulador virtual que escucha en puerto 19000 esperando conexión de la central"""
+    
+    def __init__(self):
+        self.config = ConfigRegulador()
+        self.estado = EstadoRegulador()
+        self.server_socket = None
+        self.client_socket = None
+        self.conectado = False
+        self.sesion_abierta = False
+        self.lock = threading.Lock()
+        self.ultimo_ack = time.time()
+        self.mensajes_sin_ack = 0
+        
+        print(f"\n{'='*60}")
+        print(f"🚦 REGULADOR VIRTUAL TIPO M - MODO {self.config.MODO_OPERACION}")
+        print(f"{'='*60}")
+        print(f"📍 Subregulador ID: {self.config.SUBREGULADOR_ID}")
+        print(f"🌐 Escuchando en: {self.config.ESCUCHAR_IP}:{self.config.ESCUCHAR_PORT}")
+        print(f"⚙️  Modo: {self.config.MODO_OPERACION} (Asíncrono - Envío espontáneo)")
+        print(f"{'='*60}\n")
+    
+    def iniciar_servidor(self):
+        """Inicia el servidor y espera conexión de la central"""
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.bind((self.config.ESCUCHAR_IP, self.config.ESCUCHAR_PORT))
+            self.server_socket.listen(1)
+            
+            print(f"📡 Servidor iniciado en puerto {self.config.ESCUCHAR_PORT}")
+            print(f"⏳ Esperando conexión de la central...\n")
+            
+            # Esperar conexión de la central
+            self.client_socket, addr = self.server_socket.accept()
+            self.conectado = True
+            self.sesion_abierta = True
+            self.ultimo_ack = time.time()
+            
+            print(f"✅ Central conectada desde {addr[0]}:{addr[1]}\n")
+            return True
+            
+        except socket.error as e:
+            with self.lock:
+                self.client_(f"❌ Error al iniciar servidor: {e}")
+            return False
+    
+    def enviar_mensaje(self, mensaje):
+        """Envía un mensaje a la central"""
+        if not self.conectado:
+            return False
+        
+        try:
+            self.socket.sendall(mensaje)
+            print(f"📤 Enviado: {mensaje.hex().upper()}")
+            return True
+        except socket.error as e:
+            print(f"❌ Error al enviar: {e}")
+            self.conectado = False
+            return False
+    
+    def procesar_mensaje_recibido(self, data):
+        """
+        Procesa un mensaje recibido de la central
+        En Modo B: responde solo si hay datos relevantes
+        """
+        if len(data) < 3:
+            print("⚠️ Mensaje muy corto, ignorado")
+            return
+        
+        print(f"📥 Recibido: {data.hex().upper()}")
+        
+        # Mensajes especiales de 1 byte
+        if len(data) == 1:
+            if data == ProtocoloUNE.ACK:
+                print("✅ ACK recibido")
+                self.ultimo_ack = time.time()
+                self.mensajes_sin_ack = 0
+                return
+            elif data == ProtocoloUNE.NACK:
+                print("⚠️ NACK recibido")
+                return
+            elif data == ProtocoloUNE.DC1:
+                print("🟢 DC1 - Comunicaciones ON")
+                self.enviar_mensaje(ProtocoloUNE.ACK)
+                return
+            elif data == ProtocoloUNE.DC3:
+                print("🔴 DC3 - Comunicaciones OFF")
+                self.enviar_mensaje(ProtocoloUNE.ACK)
+                return
+            elif data[0] == ProtocoloUNE.DET:
+                print("📊 DET - Petición de detectores")
+                # Almacenar datos, resetear contadores y enviar
+                self.estado.contador_detectores = [0, 0, 0, 0]
+                # En Modo B, enviar respuesta automáticamente
+                respuesta = GeneradorRespuestas.respuesta_detectores_presencia(
+                    self.estado, self.config.SUBREGULADOR_ID
+                )
+                self.enviar_mensaje(respuesta)
+                return
+        
+        # Mensajes con estructura completa
+        if not data.startswith(ProtocoloUNE.STX):
+            print("⚠️ Mensaje sin STX, ignorado")
+            return
+        
+        if not (data.endswith(ProtocoloUNE.ETX) or data.endswith(ProtocoloUNE.EOT)):
+            print("⚠️ Mensaje sin ETX/EOT, ignorado")
+            return
+        
+        # Verificar checksum
+        checksum_recibido = data[-2]
+        checksum_calculado = calcular_checksum(data[1:-2])[0]
+        if checksum_recibido != checksum_calculado:
+            print(f"⚠️ Checksum incorrecto: recibido={checksum_recibido:02X}, calculado={checksum_calculado:02X}")
+            self.enviar_mensaje(ProtocoloUNE.NACK)
+            return
+        
+        # Extraer campos
+        subregulador = data[1]
+        codigo = data[2]
+        datos = data[3:-2] if len(data) > 5 else b''
+        
+        print(f"   Subregulador: {subregulador}, Código: 0x{codigo:02X}, Datos: {datos.hex().upper()}")
+        
+        # Procesar según el código
+        self.procesar_codigo(subregulador, codigo, datos)
+    
+    def procesar_codigo(self, subregulador, codigo, datos):
+        """Procesa un código específico según la norma"""
+        
+        # Verificar si el mensaje es para este subregulador
+        if subregulador != 0 and subregulador != self.config.SUBREGULADOR_ID:
+            print(f"   (Mensaje para subregulador {subregulador}, ignorado)")
+            return
+        
+        # MODO B: Solo responde con datos relevantes
+        
+        if codigo == ProtocoloUNE.PLAN_EN_CURSO:  # 0xC9 - Pregunta por plan en curso
+            print("   → Pregunta: Plan en curso")
+            respuesta = GeneradorRespuestas.respuesta_plan_en_curso(
+                self.estado, self.config.SUBREGULADOR_ID
+            )
+            self.enviar_mensaje(respuesta)
+        
+        elif codigo == ProtocoloUNE.DET_FISICOS_PRESENCIA:  # 0xB0
+            print("   → Pregunta: Estado detectores (presencia)")
+            respuesta = GeneradorRespuestas.respuesta_detectores_presencia(
+                self.estado, self.config.SUBREGULADOR_ID
+            )
+            self.enviar_mensaje(respuesta)
+        
+        elif codigo == ProtocoloUNE.ALARMAS:  # 0xB4
+            print("   → Pregunta: Alarmas")
+            respuesta = GeneradorRespuestas.respuesta_alarmas(
+                self.estado, self.config.SUBREGULADOR_ID
+            )
+            self.enviar_mensaje(respuesta)
+        
+        elif codigo == ProtocoloUNE.SELECCION_PLAN:  # 0x51
+            if len(datos) >= 4:
+                nuevo_plan = datos[0]
+                hora = datos[1]
+                minuto = datos[2]
+                segundo = datos[3]
+                print(f"   → Orden: Cambiar a plan {nuevo_plan} a las {hora:02d}:{minuto:02d}:{segundo:02d}")
+                
+                if nuevo_plan in self.estado.planes:
+                    self.estado.plan_actual = nuevo_plan
+                    self.estado.hora_inicio_plan = datetime.now()
+                    print(f"   ✅ Plan cambiado a {nuevo_plan}")
+                    
+                    # En Modo B: Enviar respuesta con el plan en curso
+                    respuesta = GeneradorRespuestas.respuesta_plan_en_curso(
+                        self.estado, self.config.SUBREGULADOR_ID
+                    )
+                    self.enviar_mensaje(respuesta)
+        
+        elif codigo == ProtocoloUNE.DET_TIEMPO_REAL:  # 0xD3
+            print("   → Orden: Activar detectores en tiempo real")
+            self.estado.tiempo_real_detectores = True
+            # En Modo B: No responde, pero activa el envío automático
+        
+        elif codigo == ProtocoloUNE.CANCELAR_TIEMPO_REAL:  # 0xDC
+            print("   → Orden: Cancelar tiempo real")
+            self.estado.tiempo_real_detectores = False
+            self.estado.tiempo_real_cruce = False
+            # En Modo B: No responde
+        
+        elif codigo == ProtocoloUNE.CRUCE_TIEMPO_REAL:  # 0xDB
+            print("   → Orden: Activar cruce en tiempo real")
+            self.estado.tiempo_real_cruce = True
+            # En Modo B: enviará automáticamente al cambiar
+        
+        else:
+            print(f"   ⚠️ Código 0x{codigo:02X} no implementado")
+    
+    def hilo_recepcion(self):
+        """Hilo para recibir mensajes de la \n")
+        
+        while self.conectado:
+            try:
+                data = self.client_socket.recv(1024)
+                if not data:
+                    print("\n⚠️ Conexión cerrada por la central")
+                    self.conectado = False
+                    break
+                
+                self.procesar_mensaje_recibido(data)
+                
+            except socket.timeout:
+                continue
+            except socket.error as e:
+                print(f"\n❌ Error en recepción: {e}")
+                self.conectado = False
+                break
+        
+        print("🔄 Hilo de recepción finalizado")conectado = False
+                break
+    \n")
+        
+        while self.conectado:
+            time.sleep(2)  # Cada 2 segundos
+            
+            # Actualizar ciclo
+            self.estado.actualizar_ciclo()
+            
+            # Simular cambios en detectores
+            if self.estado.tiempo_real_detectores:
+                cambio = self.estado.simular_cambio_detectores()
+                if cambio:
+                    # Modo B: Enviar TRCAM automáticamente al detectar cambio
+                    trcam = GeneradorRespuestas.respuesta_trcam(self.estado)
+                    print("\n🔔 Cambio en detectores - Enviando TRCAM automáticamente")
+                    self.enviar_mensaje(trcam)
+        
+        print("🔄 Hilo de simulación finalizado"tomáticamente al detectar cambio
+                    trcam = GeneradorRespuestas.respuesta_trcam(self.estado)
+                    iniciar_servidor():
+            return
+        
+        # Iniciar hilos
+        hilo_rx = threading.Thread(target=self.hilo_recepcion, daemon=True)
+        hilo_sim = threading.Thread(target=self.hilo_simulacion, daemon=True)
+        
+        hilo_rx.start()
+        hilo_sim.start()
+        
+        print("✅ Regulador virtual ejecutándose en Modo B")
+        print("   (Envía mensajes espontáneamente al detectar cambios)")
+        print("   Presiona Ctrl+C para detener\n")
+        print("="*60)
+        
+        try:
+            while self.conectado:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n\n🛑 Deteniendo regulador...")
+        finally:
+            if self.client_socket:
+                self.client_socket.close()
+            if self.server_socket:
+                self.server_sleep(1)
+        except KeyboardInterrupt:
+            print("\n\n🛑 Deteniendo regulador...")
+        finally:
+            if self.socket:
+                self.socket.close()
+            print("👋 Regulador detenido")
+
+
+# ============================================================================
+# PUNTO DE ENTRADA
+# ============================================================================
+
+if __name__ == "__main__":
+    regulador = ReguladorVirtual()
+    regulador.ejecutar()

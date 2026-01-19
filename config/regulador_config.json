@@ -1,0 +1,518 @@
+{
+    "regulador": {
+        "nombre": "Regulador Virtual UNE",
+        "id_subregulador": 1,
+        "version": "1.10.0",
+        "modo_operacion": "A",
+        "puerto_escucha": 19000,
+        "ip_escucha": "0.0.0.0",
+        "max_grupos": 32,
+        "max_fases": 32,
+        "max_estructuras": 16,
+        "max_planes": 16
+    },
+    "subreguladores": {
+        "cpu_estado": 128,
+        "planes_sync": 129,
+        "comentario": "128 (0x80): CPU, estado, alarmas, config, grupos | 129 (0x81): Planes, sincronización, tráfico"
+    },
+    "comunicacion": {
+        "timeout_conexion": 5,
+        "intervalo_estado": 10,
+        "timeout_ack": 10,
+        "max_reintentos": 3,
+        "enviar_keep_alive": false,
+        "intervalo_keep_alive": 5,
+        "plan_id_offset": 0,
+        "comentario_offset": "Offset aplicado al plan ID antes de enviar. Normalmente 0. Planes empiezan desde 129."
+    },
+    "grupos": {
+        "cantidad": 4,
+        "descripcion": [
+            {
+                "id": 1,
+                "nombre": "Grupo 1 - Vehículos Principal",
+                "tipo": "vehicular",
+                "siempre_ambar": false
+            },
+            {
+                "id": 2,
+                "nombre": "Grupo 2 - Vehículos Secundario",
+                "tipo": "vehicular",
+                "siempre_ambar": false
+            },
+            {
+                "id": 3,
+                "nombre": "Grupo 3 - Vehículos Terciario",
+                "tipo": "vehicular",
+                "siempre_ambar": false
+            },
+            {
+                "id": 4,
+                "nombre": "Grupo 4 - Peatones Principal",
+                "tipo": "vehicular",
+                "siempre_ambar": false
+            }
+        ],
+        "comentario": "Tipos: vehicular, peatonal, ciclista. Máximo 32 grupos según UNE"
+    },
+    "detectores": {
+        "cantidad": 4,
+        "tiempo_real": false
+    },
+    "planes": {
+        "plan_activo": 129,
+        "seleccion_automatica": true,
+        "comentario": "Los planes empiezan desde ID 129 para coincidir con central Ecotrafix. Plan 129='Plan 1', 130='Plan 2', etc.",
+        "lista": [
+            {
+                "id": 129,
+                "nombre": "Plan 1",
+                "estructura_id": 1,
+                "ciclo": 70,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 20,
+                    "2": 40
+                },
+                "horarios": [
+                    {
+                        "inicio": "00:00"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 3,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            },
+            {
+                "id": 130,
+                "nombre": "Plan 2",
+                "estructura_id": 1,
+                "ciclo": 90,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 30,
+                    "2": 50
+                },
+                "horarios": [
+                    {
+                        "inicio": "04:00"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 4,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            },
+            {
+                "id": 131,
+                "nombre": "Plan 3",
+                "estructura_id": 1,
+                "ciclo": 120,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 40,
+                    "2": 70
+                },
+                "horarios": [
+                    {
+                        "inicio": "06:00"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 3,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            },
+            {
+                "id": 132,
+                "nombre": "Plan 4",
+                "estructura_id": 1,
+                "ciclo": 100,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 30,
+                    "2": 60
+                },
+                "horarios": [
+                    {
+                        "inicio": "09:30"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 3,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            },
+            {
+                "id": 133,
+                "nombre": "Plan 5",
+                "estructura_id": 1,
+                "ciclo": 100,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 30,
+                    "2": 60
+                },
+                "horarios": [
+                    {
+                        "inicio": "12:30"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 3,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            },
+            {
+                "id": 134,
+                "nombre": "Plan 6",
+                "estructura_id": 1,
+                "ciclo": 100,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 30,
+                    "2": 60
+                },
+                "horarios": [
+                    {
+                        "inicio": "14:00"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 3,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            },
+            {
+                "id": 135,
+                "nombre": "Plan 7",
+                "estructura_id": 1,
+                "ciclo": 120,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 40,
+                    "2": 70
+                },
+                "horarios": [
+                    {
+                        "inicio": "17:00"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 3,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            },
+            {
+                "id": 136,
+                "nombre": "Plan 8",
+                "estructura_id": 1,
+                "ciclo": 100,
+                "desfase": 0,
+                "activo": true,
+                "duraciones_fases": {
+                    "1": 30,
+                    "2": 60
+                },
+                "horarios": [
+                    {
+                        "inicio": "22:00"
+                    }
+                ],
+                "transitorios": {
+                    "vehicular": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    },
+                    "peatonal": {
+                        "tiempo_verde_intermitente": 3,
+                        "tiempo_rojo": 2
+                    },
+                    "ciclista": {
+                        "tiempo_ambar": 3,
+                        "tiempo_rojo_seguridad": 2
+                    }
+                }
+            }
+        ]
+    },
+    "estado_inicial": {
+        "modo_control": 1,
+        "estado_representacion": 2,
+        "comentario_modo_control": "1=Local, 2=Ordenador/Central, 3=Manual",
+        "comentario_estado_repr": "0=Apagado, 1=Intermitente, 2=Colores"
+    },
+    "fases": {
+        "comentario": "Definición de fases: asignación de colores a cada grupo. Máximo 32 fases según UNE",
+        "colores": {
+            "0": "Apagado",
+            "1": "Verde",
+            "2": "Ámbar",
+            "3": "Rojo",
+            "4": "Rojo intermitente",
+            "5": "Verde intermitente",
+            "6": "Ámbar intermitente",
+            "7": "Rojo + Ámbar",
+            "8": "Verde + Ámbar"
+        },
+        "lista": [
+            {
+                "id": 1,
+                "nombre": "Fase 1 - G1 G4 Verde",
+                "grupos": {
+                    "1": 1,
+                    "2": 3,
+                    "3": 3,
+                    "4": 1,
+                    "5": 3,
+                    "6": 3
+                },
+                "comentario": "G1 y G4 en verde, G2 y G3 en rojo"
+            },
+            {
+                "id": 2,
+                "nombre": "Fase 2 - G2 G3 Verde",
+                "grupos": {
+                    "1": 3,
+                    "2": 1,
+                    "3": 1,
+                    "4": 3,
+                    "5": 3,
+                    "6": 3
+                },
+                "comentario": "G2 y G3 en verde, G1 y G4 en rojo"
+            },
+            {
+                "id": 3,
+                "nombre": "Fase 3 - Peatones",
+                "grupos": {
+                    "1": 3,
+                    "2": 3,
+                    "3": 3,
+                    "4": 1,
+                    "5": 1,
+                    "6": 3
+                },
+                "comentario": "Grupos peatonales en verde"
+            },
+            {
+                "id": 4,
+                "nombre": "Fase 4 - Todo Rojo",
+                "grupos": {
+                    "1": 3,
+                    "2": 3,
+                    "3": 3,
+                    "4": 3,
+                    "5": 3,
+                    "6": 3
+                },
+                "comentario": "Fase de seguridad - todo rojo"
+            }
+        ]
+    },
+    "estructuras": {
+        "comentario": "Secuencias de fases con transitorios. Una estructura define el orden de fases. Los planes referencian estructuras.",
+        "lista": [
+            {
+                "id": 1,
+                "nombre": "Estructura Básica 2 Fases",
+                "secuencia": [
+                    {
+                        "fase": 1,
+                        "tipo": "estable"
+                    },
+                    {
+                        "transitorio": 1,
+                        "tipo": "transitorio"
+                    },
+                    {
+                        "fase": 2,
+                        "tipo": "estable"
+                    },
+                    {
+                        "transitorio": 2,
+                        "tipo": "transitorio"
+                    }
+                ],
+                "descripcion": "Ciclo simple: Fase1 → Trans1 → Fase2 → Trans2 → (repite)"
+            },
+            {
+                "id": 2,
+                "nombre": "Estructura 3 Fases con Peatones",
+                "secuencia": [
+                    {
+                        "fase": 1,
+                        "tipo": "estable"
+                    },
+                    {
+                        "transitorio": 1,
+                        "tipo": "transitorio"
+                    },
+                    {
+                        "fase": 2,
+                        "tipo": "estable"
+                    },
+                    {
+                        "transitorio": 2,
+                        "tipo": "transitorio"
+                    },
+                    {
+                        "fase": 3,
+                        "tipo": "estable"
+                    },
+                    {
+                        "transitorio": 3,
+                        "tipo": "transitorio"
+                    }
+                ],
+                "descripcion": "Ciclo con fase peatonal: F1 → T1 → F2 → T2 → F3(peatones) → T3"
+            },
+            {
+                "id": 3,
+                "nombre": "Estructura Todo Rojo",
+                "secuencia": [
+                    {
+                        "fase": 4,
+                        "tipo": "estable"
+                    }
+                ],
+                "descripcion": "Estructura para flash/emergencia - todo rojo permanente"
+            }
+        ]
+    },
+    "transitorios": {
+        "comentario": "Tiempos de transitorio entre fases según tipo de grupo",
+        "vehicular": {
+            "tiempo_ambar": 3,
+            "tiempo_rojo_seguridad": 2,
+            "comentario": "Secuencia: Verde → Ámbar (3s) → Rojo (2s) → siguiente fase"
+        },
+        "peatonal": {
+            "tiempo_verde_intermitente": 5,
+            "tiempo_rojo": 2,
+            "comentario": "Secuencia: Verde → Verde intermitente (5s) → Rojo (2s) → siguiente fase"
+        },
+        "tabla_transitorios": [
+            {
+                "id": 1,
+                "nombre": "Transitorio estándar",
+                "descripcion": "Transitorio por defecto para todas las fases",
+                "secuencia": [
+                    {
+                        "tipo": "vehicular",
+                        "accion": "ambar",
+                        "duracion": 3
+                    },
+                    {
+                        "tipo": "vehicular",
+                        "accion": "rojo_seguridad",
+                        "duracion": 2
+                    },
+                    {
+                        "tipo": "peatonal",
+                        "accion": "verde_intermitente",
+                        "duracion": 5
+                    },
+                    {
+                        "tipo": "peatonal",
+                        "accion": "rojo",
+                        "duracion": 2
+                    }
+                ]
+            }
+        ]
+    },
+    "alarmas": {
+        "alarma_roja": false,
+        "alarma_lampara": false,
+        "alarma_conflicto": false,
+        "alarma_puerta": false,
+        "alarma_tension": false
+    },
+    "logging": {
+        "nivel": "INFO",
+        "archivo": "logs/regulador.log",
+        "formato": "%(asctime)s | %(levelname)-8s | %(message)s",
+        "max_bytes": 10485760,
+        "backup_count": 5
+    }
+}

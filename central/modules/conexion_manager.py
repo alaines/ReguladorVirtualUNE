@@ -172,9 +172,20 @@ class ConexionTCP(ConexionBase):
                         self.bytes_recibidos += len(data)
                         sin_datos_count = 0  # Reset contador
                         
+                        # Procesar ACK/NACK de un solo byte al inicio del buffer
+                        while buffer and buffer[0] in (0x06, 0x15):
+                            ack_byte = bytes([buffer[0]])
+                            self._rx_queue.put(ack_byte)
+                            self.mensajes_recibidos += 1
+                            buffer = buffer[1:]
+                        
                         # Procesar mensajes completos (STX ... ETX)
                         while b'\x02' in buffer and b'\x03' in buffer:
                             start = buffer.find(b'\x02')
+                            # Descartar bytes basura antes del STX
+                            if start > 0:
+                                buffer = buffer[start:]
+                                start = 0
                             end = buffer.find(b'\x03', start)
                             if end > start:
                                 mensaje = buffer[start:end+1]

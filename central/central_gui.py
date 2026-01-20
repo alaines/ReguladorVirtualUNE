@@ -2,7 +2,28 @@
 """
 CENTRAL VIRTUAL UNE 135401-4
 Interfaz gráfica para gestión de múltiples reguladores de tráfico
-Versión 1.0.0
+Versión 1.5.3
+
+Cambios v1.5.3:
+- Soporte para ACK/NACK de un solo byte (0x06/0x15)
+- Receptor de conexión ahora procesa ACKs correctamente
+- Decodificador maneja mensajes ACK de 1 byte
+- Subregulador 129 para sincronización/tráfico (compatible con regulador real)
+
+Cambios v1.5.2:
+- Mostrar "--" en plan, ciclo, fase, hora cuando no hay datos del regulador
+- Log de depuración en _actualizar_estado_visual
+- Log de TX/RX también al archivo de log
+
+Cambios v1.5.1:
+- Log de comunicación más detallado (muestra Raw hex y todos los datos decodificados)
+- Agregado logging de depuración en procesamiento de respuestas
+
+Cambios v1.5.0:
+- Corregido decodificador de sincronización (0x91): orden correcto de bytes
+- Corregido decodificador de grupos (0xB9): ahora procesa 1 byte/grupo en lugar de 2 bits/grupo
+- Corregido decodificador de tráfico (0x94): ya no espera grupos (vienen en 0xB9)
+- Mejorado _enviar_comando: ahora procesa TODOS los mensajes en cola (incluye B9 espontáneos)
 """
 
 import tkinter as tk
@@ -50,7 +71,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from modules import (
     ProtocoloCentral,
     ConexionManager, ConexionTCP, ConexionSerial,
-    EstadoRegulador, GestorReguladores, EstadoConexion, EstadoRepresentacion,
+    EstadoRegulador, GestorReguladores, EstadoConexion, EstadoRepresentacion, ModoControl,
     DecodificadorUNE
 )
 
@@ -93,7 +114,7 @@ ESTILOS_GRUPOS = {
 class CentralGUI:
     """Interfaz gráfica principal de la Central"""
     
-    VERSION = "1.3.0"
+    VERSION = "1.5.6"
     
     def __init__(self, root):
         self.root = root
@@ -119,6 +140,10 @@ class CentralGUI:
         self.polling_threads = {}
         self.log_queue = queue.Queue()
         
+        # Lock por regulador para serializar comandos (evita race conditions)
+        self._reg_locks = {}  # {reg_id: threading.Lock()}
+        self._reg_locks_lock = threading.Lock()  # Lock para acceder al diccionario de locks
+        
         # Cargar configuración
         self.config = self._cargar_config()
         self._cargar_reguladores()
@@ -129,6 +154,9 @@ class CentralGUI:
         
         # Iniciar procesamiento de logs
         self._procesar_logs()
+        
+        # Iniciar reloj del sistema
+        self._actualizar_reloj_sistema()
         
         # Cerrar correctamente
         self.root.protocol("WM_DELETE_WINDOW", self._on_cerrar)
@@ -643,18 +671,47 @@ class CentralGUI:
         self.lbl_fase = ttk.Label(row1, text="Fase: --", style='Panel.TLabel')
         self.lbl_fase.pack(side='left', padx=10)
         
-        # Fila 2: Modo, Hora
+        # Fila 2: Modo, Hora Plan
         row2 = ttk.Frame(info_frame, style='Panel.TFrame')
         row2.pack(fill='x', pady=2)
         
         self.lbl_modo = ttk.Label(row2, text="Modo: --", style='Panel.TLabel')
         self.lbl_modo.pack(side='left', padx=10)
         
-        self.lbl_hora = ttk.Label(row2, text="Hora: --:--:--", style='Panel.TLabel')
+        self.lbl_hora = ttk.Label(row2, text="H.Plan: --:--:--", style='Panel.TLabel')
         self.lbl_hora.pack(side='left', padx=10)
         
         self.lbl_seg_ciclo = ttk.Label(row2, text="Seg. Ciclo: --", style='Panel.TLabel')
         self.lbl_seg_ciclo.pack(side='left', padx=10)
+        
+        # Fila 3: Modo Control (LOCAL/ORDENADOR) con botón de cambio
+        row3 = ttk.Frame(info_frame, style='Panel.TFrame')
+        row3.pack(fill='x', pady=2)
+        
+        self.lbl_modo_control = tk.Label(row3, text="Control: --", bg=COLORES['panel'], 
+                                         fg=COLORES['texto'], font=('Segoe UI', 10, 'bold'))
+        self.lbl_modo_control.pack(side='left', padx=10)
+        
+        # Botón para cambiar modo
+        self.btn_cambiar_modo = tk.Button(row3, text="🔄 Cambiar Modo", command=self._cmd_cambiar_modo,
+                                          bg=COLORES['acento'], fg=COLORES['texto'],
+                                          activebackground=COLORES['acento_hover'],
+                                          activeforeground=COLORES['texto'],
+                                          font=('Segoe UI', 8), padx=5, pady=1,
+                                          relief='flat', cursor='hand2')
+        self.btn_cambiar_modo.pack(side='left', padx=5)
+        
+        # Aviso de modo LOCAL
+        self.lbl_aviso_local = tk.Label(row3, text="", bg=COLORES['panel'], 
+                                        fg=COLORES['advertencia'], font=('Segoe UI', 8, 'italic'))
+        self.lbl_aviso_local.pack(side='left', padx=5)
+        
+        # Fila 4: Hora actual del sistema
+        row4 = ttk.Frame(info_frame, style='Panel.TFrame')
+        row4.pack(fill='x', pady=2)
+        
+        self.lbl_hora_sistema = ttk.Label(row4, text="🕐 Hora Sistema: --:--:--", style='Panel.TLabel')
+        self.lbl_hora_sistema.pack(side='left', padx=10)
         
         # Frame contenedor para grupos de semáforos
         self.grupos_container = ttk.Frame(estado_frame, style='Panel.TFrame')
@@ -671,16 +728,24 @@ class CentralGUI:
         alarmas_frame = ttk.Frame(estado_frame, style='Panel.TFrame')
         alarmas_frame.pack(fill='x', padx=10, pady=5)
         
-        ttk.Label(alarmas_frame, text="ALARMAS:", style='Panel.TLabel').pack(side='left', padx=5)
+        tk.Label(alarmas_frame, text="ALARMAS:", bg=COLORES['panel'], fg=COLORES['texto'],
+                 font=('Segoe UI', 9, 'bold')).pack(side='left', padx=5)
         
         self.alarmas_labels = {}
-        alarmas = [('lamp', '💡 Lámpara'), ('conf', '⚠️ Conflicto'), 
-                   ('puerta', '🚪 Puerta'), ('24v', '🔌 24V'), ('rojo', '🔴 Fallo Rojo')]
+        alarmas_info = [
+            ('lamp', '💡 Lámpara', 'lampara_fundida'),
+            ('conf', '⚠️ Conflicto', 'conflicto'), 
+            ('puerta', '🚪 Puerta', 'puerta_abierta'),
+            ('24v', '🔌 24V', 'fallo_24v'),
+            ('rojo', '🔴 F.Rojo', 'fallo_rojo')
+        ]
         
-        for key, texto in alarmas:
-            lbl = ttk.Label(alarmas_frame, text=texto, style='Panel.TLabel')
-            lbl.pack(side='left', padx=10)
-            self.alarmas_labels[key] = lbl
+        for key, texto, attr in alarmas_info:
+            # Usar tk.Label para poder cambiar fg dinámicamente
+            lbl = tk.Label(alarmas_frame, text=texto, bg=COLORES['panel'], 
+                          fg=COLORES['texto_dim'], font=('Segoe UI', 9))
+            lbl.pack(side='left', padx=8)
+            self.alarmas_labels[key] = {'label': lbl, 'texto': texto, 'attr': attr}
     
     def _crear_semaforos_grupos(self, num_grupos: int):
         """Crea los semáforos visuales para los grupos"""
@@ -747,8 +812,13 @@ class CentralGUI:
         except ValueError:
             pass
     
-    def _actualizar_semaforo_grupo(self, grupo_idx: int, estado: str):
-        """Actualiza el color del semáforo de un grupo"""
+    def _actualizar_semaforo_grupo(self, grupo_idx: int, estado):
+        """Actualiza el color del semáforo de un grupo
+        
+        Args:
+            grupo_idx: Índice del grupo (0-based)
+            estado: Puede ser int (0-6) o str (VERDE, ROJO, etc.)
+        """
         if grupo_idx not in self.semaforos_canvas:
             return
         
@@ -765,29 +835,43 @@ class CentralGUI:
         canvas.itemconfig(sem['ambar'], fill=colores_off['ambar'])
         canvas.itemconfig(sem['verde'], fill=colores_off['verde'])
         
-        # Actualizar según estado
-        estado_upper = estado.upper() if estado else ''
+        # Si es int, convertir a string de estado
+        if isinstance(estado, int):
+            # 0=Apagado, 1=Verde, 2=Ámbar, 3=Rojo, 4=Rojo Int., 5=Verde Int., 6=Ámbar Int.
+            estado_map = {0: 'APAGADO', 1: 'VERDE', 2: 'AMBAR', 3: 'ROJO', 
+                          4: 'ROJO', 5: 'VERDE', 6: 'AMBAR'}
+            estado_str = estado_map.get(estado, 'APAGADO')
+            # Marcar si es intermitente
+            is_intermitente = estado in [4, 5, 6]
+        else:
+            estado_str = str(estado).upper() if estado else ''
+            is_intermitente = 'INT' in estado_str or estado_str in ['INTERMITENTE', 'FLASH', 'F']
         
-        if estado_upper in ['ROJO', 'R', 'RED']:
+        # Actualizar según estado
+        if estado_str in ['ROJO', 'R', 'RED']:
             canvas.itemconfig(sem['rojo'], fill=colores_on['rojo'])
-            sem['label'].config(text='R', fg=colores_on['rojo'])
-        elif estado_upper in ['AMBAR', 'A', 'AMBER', 'YELLOW']:
+            lbl_text = 'R⚡' if is_intermitente else 'R'
+            sem['label'].config(text=lbl_text, fg=colores_on['rojo'])
+        elif estado_str in ['AMBAR', 'A', 'AMBER', 'YELLOW']:
             canvas.itemconfig(sem['ambar'], fill=colores_on['ambar'])
-            sem['label'].config(text='A', fg=colores_on['ambar'])
-        elif estado_upper in ['VERDE', 'V', 'GREEN', 'G']:
+            lbl_text = 'A⚡' if is_intermitente else 'A'
+            sem['label'].config(text=lbl_text, fg=colores_on['ambar'])
+        elif estado_str in ['VERDE', 'V', 'GREEN', 'G']:
             canvas.itemconfig(sem['verde'], fill=colores_on['verde'])
-            sem['label'].config(text='V', fg=colores_on['verde'])
-        elif estado_upper in ['ROJO_AMBAR', 'RA', 'RED_AMBER']:
+            lbl_text = 'V⚡' if is_intermitente else 'V'
+            sem['label'].config(text=lbl_text, fg=colores_on['verde'])
+        elif estado_str in ['ROJO_AMBAR', 'RA', 'RED_AMBER']:
             canvas.itemconfig(sem['rojo'], fill=colores_on['rojo'])
             canvas.itemconfig(sem['ambar'], fill=colores_on['ambar'])
             sem['label'].config(text='RA', fg=colores_on['ambar'])
-        elif estado_upper in ['APAGADO', 'OFF', '-', '']:
+        elif estado_str in ['APAGADO', 'OFF', '-', '']:
             sem['label'].config(text='--', fg=COLORES['texto_dim'])
-        elif estado_upper in ['INTERMITENTE', 'FLASH', 'F']:
+        elif estado_str in ['INTERMITENTE', 'FLASH', 'F']:
             canvas.itemconfig(sem['ambar'], fill=colores_on['ambar'])
             sem['label'].config(text='⚡', fg=colores_on['ambar'])
         else:
-            sem['label'].config(text=estado[:2] if estado else '--', fg=COLORES['texto_dim'])
+            text_show = str(estado)[:2] if estado else '--'
+            sem['label'].config(text=text_show, fg=COLORES['texto_dim'])
 
     def _crear_panel_planes(self, parent):
         """Crea el panel de planes y configuración del regulador"""
@@ -1313,19 +1397,41 @@ class CentralGUI:
     
     def _actualizar_estado_visual(self, reg: EstadoRegulador):
         """Actualiza los indicadores visuales del estado"""
+        logger.debug(f"Actualizando visual para reg {reg.id}: conectado={reg.conectado}, plan={reg.plan_actual}, fase={reg.fase_actual}")
+        
         # Estado de conexión
         if reg.conectado:
             self.lbl_estado_conexion.config(text="Estado: 🟢 Conectado")
         else:
             self.lbl_estado_conexion.config(text="Estado: ⚪ Desconectado")
         
-        # Info del regulador
-        self.lbl_plan.config(text=f"Plan: {reg.plan_actual}")
-        self.lbl_ciclo.config(text=f"Ciclo: {reg.ciclo_total}s")
-        self.lbl_fase.config(text=f"Fase: {reg.fase_actual}")
+        # Verificar si hay datos recibidos (ultima_comunicacion no es None)
+        tiene_datos = reg.ultima_comunicacion is not None
+        
+        # Info del regulador - mostrar valores o -- si no hay datos
+        if tiene_datos:
+            plan_text = f"Plan: {reg.plan_actual}"
+            ciclo_text = f"Ciclo: {reg.ciclo_total}s"
+            fase_text = f"Fase: {reg.fase_actual}"
+            # La hora del 0x91 es la hora de inicio del plan
+            hora_text = f"H.Plan: {reg.hora_formateada}"
+            seg_ciclo_text = f"Seg. Ciclo: {reg.segundos_ciclo}"
+        else:
+            plan_text = "Plan: --"
+            ciclo_text = "Ciclo: --"
+            fase_text = "Fase: --"
+            hora_text = "H.Plan: --:--:--"
+            seg_ciclo_text = "Seg. Ciclo: --"
+        
+        self.lbl_plan.config(text=plan_text)
+        self.lbl_ciclo.config(text=ciclo_text)
+        self.lbl_fase.config(text=fase_text)
         self.lbl_modo.config(text=f"Modo: {reg.estado_repr_texto}")
-        self.lbl_hora.config(text=f"Hora: {reg.hora_formateada}")
-        self.lbl_seg_ciclo.config(text=f"Seg. Ciclo: {reg.segundos_ciclo}")
+        self.lbl_hora.config(text=hora_text)
+        self.lbl_seg_ciclo.config(text=seg_ciclo_text)
+        
+        # Actualizar modo de control (LOCAL/ORDENADOR)
+        self._actualizar_modo_control_visual(reg)
         
         # Actualizar semáforos de grupos
         for i in range(self.num_grupos_actual):
@@ -1334,6 +1440,66 @@ class CentralGUI:
                 self._actualizar_semaforo_grupo(i, estado)
             else:
                 self._actualizar_semaforo_grupo(i, 'APAGADO')
+        
+        # Actualizar alarmas
+        self._actualizar_alarmas_visual(reg)
+    
+    def _actualizar_alarmas_visual(self, reg: EstadoRegulador):
+        """Actualiza la visualización de alarmas"""
+        # Colores para alarmas
+        color_activa = '#ff4444'  # Rojo brillante
+        color_inactiva = COLORES['texto_dim']  # Gris
+        
+        for key, info in self.alarmas_labels.items():
+            lbl = info['label']
+            texto_base = info['texto']
+            attr = info['attr']
+            
+            # Obtener estado de la alarma
+            alarma_activa = getattr(reg.alarmas, attr, False)
+            
+            if alarma_activa:
+                texto = f"⚡{texto_base}"
+                
+                # Para fallo_rojo y lampara_fundida, mostrar grupos afectados
+                if attr in ['fallo_rojo', 'lampara_fundida'] and reg.alarmas.grupos_con_fallo:
+                    grupos_texto = ", ".join([f"G{g}" for g in reg.alarmas.grupos_con_fallo])
+                    texto = f"⚡{texto_base} ({grupos_texto})"
+                
+                # Alarma activa - mostrar en rojo con indicador
+                lbl.config(fg=color_activa, text=texto)
+            else:
+                # Alarma inactiva - mostrar en gris normal
+                lbl.config(fg=color_inactiva, text=texto_base)
+    
+    def _actualizar_modo_control_visual(self, reg: EstadoRegulador):
+        """Actualiza la visualización del modo de control (LOCAL/ORDENADOR)"""
+        modo_texto = reg.modo_control_texto
+        
+        # Color según modo
+        if reg.modo_control == ModoControl.LOCAL:
+            color = COLORES['advertencia']  # Naranja - modo local
+            aviso = "⚠️ La hora NO se sincronizará en modo LOCAL"
+        elif reg.modo_control == ModoControl.ORDENADOR:
+            color = COLORES['exito']  # Verde - modo ordenador (remoto)
+            aviso = ""
+        elif reg.modo_control == ModoControl.DESCONOCIDO:
+            color = COLORES['texto_dim']  # Gris - desconocido
+            aviso = ""
+        else:
+            color = COLORES['advertencia']  # Naranja - otros modos
+            aviso = ""
+        
+        self.lbl_modo_control.config(text=f"Control: {modo_texto}", fg=color)
+        self.lbl_aviso_local.config(text=aviso)
+        
+        # Actualizar texto del botón según modo actual
+        if reg.modo_control == ModoControl.LOCAL:
+            self.btn_cambiar_modo.config(text="📡 Pasar a ORDENADOR")
+        elif reg.modo_control == ModoControl.ORDENADOR:
+            self.btn_cambiar_modo.config(text="🏠 Pasar a LOCAL")
+        else:
+            self.btn_cambiar_modo.config(text="🔄 Cambiar Modo")
     
     def _agregar_regulador(self):
         """Agrega un nuevo regulador"""
@@ -1487,10 +1653,87 @@ class CentralGUI:
         self.polling_activo = True
         
         def polling_loop():
+            poll_count = 0
+            hora_sincronizada = False  # Flag para sincronizar hora
+            modo_ordenador_solicitado = False  # Flag para solicitar modo ORDENADOR
+            # Con polling de 5s: 36 polls = 3 min, 60 polls = 5 min, 360 polls = 30 min
+            
             while self.polling_activo and reg.conectado:
                 try:
-                    # Enviar sincronización
+                    poll_count += 1
+                    
+                    # Primer poll: consultar modo de control y solicitar cambio a ORDENADOR
+                    if poll_count == 1:
+                        # Consultar modo actual
+                        self._enviar_comando(reg, self.protocolo.msg_consulta_modo_control())
+                        time.sleep(0.3)
+                        
+                        # Automáticamente solicitar cambio a ORDENADOR
+                        self._log(f"[{reg.id:03d}] 📡 Solicitando modo ORDENADOR automáticamente...", "INFO")
+                        self._enviar_comando(reg, self.protocolo.msg_modo_ordenador())
+                        time.sleep(0.3)
+                        modo_ordenador_solicitado = True
+                        
+                        # Re-consultar modo para ver si cambió
+                        self._enviar_comando(reg, self.protocolo.msg_consulta_modo_control())
+                        time.sleep(0.3)
+                    
+                    # Sincronización de hora inteligente:
+                    # - Primera conexión: inmediatamente (después de solicitar modo ORDENADOR)
+                    # - Primeros 30 min (360 polls): cada 3 min (36 polls)
+                    # - Después: cada 5 min (60 polls)
+                    # NOTA: Solo sincroniza hora si está en modo ORDENADOR
+                    if not hora_sincronizada:
+                        # Verificar si está en modo ORDENADOR antes de sincronizar hora
+                        if reg.modo_control == ModoControl.ORDENADOR or poll_count == 1:
+                            now = datetime.now()
+                            msg_hora = self.protocolo.msg_puesta_hora(now.hour, now.minute, now.second, now.day, now.month, now.year % 100)
+                            self._enviar_comando(reg, msg_hora)
+                            if reg.modo_control == ModoControl.ORDENADOR:
+                                self._log(f"[{reg.id:03d}] 🕐 Hora sincronizada: {now.strftime('%H:%M:%S')}", "INFO")
+                            else:
+                                self._log(f"[{reg.id:03d}] ⚠️ Hora enviada pero regulador en modo {reg.modo_control_texto} - puede no aplicarse", "WARNING")
+                            time.sleep(0.3)
+                            hora_sincronizada = True
+                        elif reg.modo_control == ModoControl.LOCAL:
+                            # En modo LOCAL, no insistir con la hora
+                            self._log(f"[{reg.id:03d}] ⚠️ Regulador en modo LOCAL - hora no sincronizada", "WARNING")
+                            hora_sincronizada = True  # Marcar como "sincronizada" para no insistir
+                    
+                    # Siempre enviar sincronización (0x91) - obtiene hora, plan, ciclo
                     self._enviar_comando(reg, self.protocolo.msg_sincronizacion())
+                    time.sleep(0.3)  # Pequeña pausa entre comandos
+                    
+                    # Cada 2 polls, solicitar datos de tráfico (0x94) - incluye estado repr
+                    if poll_count % 2 == 0:
+                        self._enviar_comando(reg, self.protocolo.msg_datos_trafico())
+                        time.sleep(0.3)
+                    
+                    # Cada 3 polls, solicitar alarmas (0xB4)
+                    if poll_count % 3 == 0:
+                        self._enviar_comando(reg, self.protocolo.msg_estado_alarmas())
+                        time.sleep(0.3)
+                    
+                    # Cada 4 polls, solicitar estado de grupos (0xB9) - COLORES
+                    if poll_count % 4 == 0:
+                        self._enviar_comando(reg, self.protocolo.msg_estado_grupos())
+                        time.sleep(0.3)
+                    
+                    # Cada 5 polls, consultar modo de control (0xB3)
+                    if poll_count % 5 == 0:
+                        self._enviar_comando(reg, self.protocolo.msg_consulta_modo_control())
+                        time.sleep(0.3)
+                    
+                    # Re-sincronizar hora según el tiempo transcurrido
+                    if poll_count <= 360:  # Primeros 30 minutos
+                        # Cada 3 minutos (36 polls)
+                        if poll_count % 36 == 0:
+                            hora_sincronizada = False
+                    else:  # Después de 30 minutos
+                        # Cada 5 minutos (60 polls)
+                        if poll_count % 60 == 0:
+                            hora_sincronizada = False
+                    
                     time.sleep(reg.polling_intervalo_ms / 1000.0)
                 except Exception as e:
                     logger.error(f"Error en polling {reg.id}: {e}")
@@ -1509,53 +1752,111 @@ class CentralGUI:
     # COMANDOS
     # =========================================================================
     
+    def _obtener_lock_regulador(self, reg_id: int) -> threading.Lock:
+        """Obtiene o crea un lock para un regulador específico"""
+        with self._reg_locks_lock:
+            if reg_id not in self._reg_locks:
+                self._reg_locks[reg_id] = threading.Lock()
+            return self._reg_locks[reg_id]
+    
     def _enviar_comando(self, reg: EstadoRegulador, mensaje: bytes):
-        """Envía un comando a un regulador y procesa la respuesta"""
+        """Envía un comando a un regulador y procesa la respuesta (thread-safe)"""
         conexion = self.conexiones.obtener(reg.id)
         if not conexion or not conexion.conectado:
             self._log(f"[{reg.id:03d}] No conectado", "WARNING")
+            logger.warning(f"[{reg.id:03d}] No conectado para enviar comando")
             return
         
-        # Log TX
-        self._log(f"[{reg.id:03d}] → {self.protocolo.formatear_mensaje(mensaje)}", "TX")
+        # Obtener lock para este regulador (serializa comandos)
+        lock = self._obtener_lock_regulador(reg.id)
         
-        # Enviar
-        if conexion.enviar(mensaje):
-            reg.mensajes_enviados += 1
+        with lock:  # Solo un comando a la vez por regulador
+            # Log TX detallado
+            tx_msg = f"[{reg.id:03d}] TX → {self.protocolo.formatear_mensaje(mensaje)} | Raw: {mensaje.hex()}"
+            self._log(tx_msg, "TX")
+            logger.info(tx_msg)
             
-            # Esperar respuesta
-            respuesta = conexion.recibir(timeout=2.0)
-            if respuesta:
-                reg.mensajes_recibidos += 1
+            # Enviar
+            if conexion.enviar(mensaje):
+                reg.mensajes_enviados += 1
                 
-                # Decodificar
-                msg_dec = self.decodificador.decodificar(respuesta)
-                self._log(f"[{reg.id:03d}] ← {self.decodificador.formatear_mensaje(msg_dec)}", "RX")
-                
-                # Actualizar estado según tipo de mensaje
-                self._procesar_respuesta(reg, msg_dec)
+                # Procesar TODOS los mensajes pendientes en la cola (incluyendo espontáneos B9)
+                # Primera respuesta con timeout largo
+                respuesta = conexion.recibir(timeout=2.0)
+                while respuesta:
+                    reg.mensajes_recibidos += 1
+                    
+                    # Decodificar
+                    msg_dec = self.decodificador.decodificar(respuesta)
+                    rx_msg = f"[{reg.id:03d}] RX ← {self.decodificador.formatear_mensaje(msg_dec)} | Raw: {respuesta.hex()}"
+                    self._log(rx_msg, "RX")
+                    logger.info(rx_msg)
+                    
+                    # Actualizar estado según tipo de mensaje
+                    self._procesar_respuesta(reg, msg_dec)
+                    
+                    # Intentar recibir más mensajes con timeout corto (espontáneos)
+                    respuesta = conexion.recibir(timeout=0.1)
+            else:
+                logger.error(f"[{reg.id:03d}] Error al enviar mensaje: {conexion.ultimo_error}")
     
     def _procesar_respuesta(self, reg: EstadoRegulador, msg):
         """Procesa una respuesta decodificada"""
         if not msg.valido:
+            logger.warning(f"Mensaje inválido recibido: {msg.error}")
             return
         
+        logger.debug(f"Procesando respuesta código=0x{msg.codigo:02X} datos={msg.datos}")
+        
         if msg.codigo == 0x91:  # Sincronización
+            logger.info(f"[{reg.id:03d}] 0x91 Sync: plan={msg.datos.get('plan')}, fase={msg.datos.get('fase_actual')}, ciclo={msg.datos.get('segundos_ciclo')}")
             reg.actualizar_desde_sincronizacion(msg.datos)
         
         elif msg.codigo == 0xB9:  # Estado de grupos
             if 'grupos' in msg.datos:
+                logger.info(f"[{reg.id:03d}] 0xB9 Grupos: {len(msg.datos['grupos'])} grupos")
                 reg.actualizar_grupos(msg.datos['grupos'])
         
         elif msg.codigo == 0xB4:  # Alarmas
             if 'alarmas' in msg.datos:
                 reg.actualizar_alarmas(msg.datos['alarmas'])
+                # Guardar grupos con fallo si vienen en el mensaje
+                if 'grupos_con_fallo' in msg.datos:
+                    reg.alarmas.grupos_con_fallo = msg.datos['grupos_con_fallo']
+                    if msg.datos['grupos_con_fallo']:
+                        logger.info(f"[{reg.id:03d}] 0xB4 Grupos con fallo: {msg.datos['grupos_con_fallo']}")
+        
+        elif msg.codigo == 0xB6:  # Grupos averiados (detalle)
+            if 'grupos_averiados' in msg.datos:
+                reg.alarmas.grupos_averiados = msg.datos['grupos_averiados']
+                for ga in msg.datos['grupos_averiados']:
+                    logger.info(f"[{reg.id:03d}] 0xB6 {ga['descripcion']}")
+        
+        elif msg.codigo == 0xB3:  # Cambio/consulta modo de control
+            if 'modo_control' in msg.datos:
+                modo_valor = msg.datos['modo_control']
+                # Ignorar si hubo error de formato (respuesta inválida del regulador)
+                if msg.datos.get('error_formato'):
+                    logger.warning(f"[{reg.id:03d}] 0xB3 Respuesta con formato inválido - ignorada")
+                elif modo_valor >= 0:
+                    try:
+                        reg.modo_control = ModoControl(modo_valor)
+                    except ValueError:
+                        reg.modo_control = ModoControl.DESCONOCIDO
+                    logger.info(f"[{reg.id:03d}] 0xB3 Modo control: {reg.modo_control_texto}")
+            if 'estado_repr' in msg.datos and not msg.datos.get('error_formato'):
+                try:
+                    reg.estado_repr = EstadoRepresentacion(msg.datos['estado_repr'])
+                except ValueError:
+                    pass
         
         elif msg.codigo == 0x94:  # Datos tráfico
             if 'estado_repr' in msg.datos:
                 reg.estado_repr = EstadoRepresentacion(msg.datos['estado_repr'])
+            # NOTA: El regulador NO envía grupos en 0x94, los envía en 0xB9
         
-        # Actualizar GUI
+        # Actualizar GUI y lista de reguladores
+        self.root.after(0, self._actualizar_lista_reguladores)
         if self.regulador_seleccionado and self.regulador_seleccionado.id == reg.id:
             self.root.after(0, lambda: self._actualizar_estado_visual(reg))
     
@@ -1597,7 +1898,7 @@ class CentralGUI:
         if not self.regulador_seleccionado:
             return
         now = datetime.now()
-        msg = self.protocolo.msg_puesta_hora(now.hour, now.minute, now.second, now.day, now.month)
+        msg = self.protocolo.msg_puesta_hora(now.hour, now.minute, now.second, now.day, now.month, now.year % 100)
         self._enviar_comando(self.regulador_seleccionado, msg)
     
     def _cmd_solicitar_estado(self):
@@ -1612,6 +1913,45 @@ class CentralGUI:
         if not self.regulador_seleccionado:
             return
         msg = self.protocolo.msg_borrar_alarmas()
+        self._enviar_comando(self.regulador_seleccionado, msg)
+    
+    def _cmd_cambiar_modo(self):
+        """Comando: Cambiar modo de control (LOCAL <-> ORDENADOR)"""
+        if not self.regulador_seleccionado:
+            messagebox.showwarning("Aviso", "Seleccione un regulador")
+            return
+        
+        reg = self.regulador_seleccionado
+        
+        # Determinar el nuevo modo
+        if reg.modo_control == ModoControl.LOCAL:
+            # Cambiar a ORDENADOR
+            msg = self.protocolo.msg_modo_ordenador()
+            nuevo_modo = "ORDENADOR"
+        else:
+            # Cambiar a LOCAL (o si es desconocido, probar ORDENADOR)
+            if reg.modo_control == ModoControl.DESCONOCIDO:
+                msg = self.protocolo.msg_modo_ordenador()
+                nuevo_modo = "ORDENADOR"
+            else:
+                msg = self.protocolo.msg_modo_local()
+                nuevo_modo = "LOCAL"
+        
+        self._log(f"[{reg.id:03d}] 🔄 Solicitando cambio a modo {nuevo_modo}", "INFO")
+        self._enviar_comando(reg, msg)
+        
+        # Consultar el modo actual después de un breve retardo
+        def consultar_modo():
+            time.sleep(0.5)
+            self._enviar_comando(reg, self.protocolo.msg_consulta_modo_control())
+        
+        threading.Thread(target=consultar_modo, daemon=True).start()
+    
+    def _cmd_consultar_modo(self):
+        """Comando: Consultar modo de control actual"""
+        if not self.regulador_seleccionado:
+            return
+        msg = self.protocolo.msg_consulta_modo_control()
         self._enviar_comando(self.regulador_seleccionado, msg)
     
     def _cmd_bloque_plan(self):
@@ -1641,7 +1981,7 @@ class CentralGUI:
         """Comando en bloque: Puesta en hora global"""
         now = datetime.now()
         for reg in self._obtener_reguladores_destino():
-            msg = self.protocolo.msg_puesta_hora(now.hour, now.minute, now.second, now.day, now.month)
+            msg = self.protocolo.msg_puesta_hora(now.hour, now.minute, now.second, now.day, now.month, now.year % 100)
             threading.Thread(target=self._enviar_comando, args=(reg, msg), daemon=True).start()
     
     def _obtener_reguladores_destino(self):
@@ -1663,6 +2003,16 @@ class CentralGUI:
         """Agrega un mensaje al log"""
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         self.log_queue.put((f"{timestamp} {mensaje}", nivel))
+    
+    def _actualizar_reloj_sistema(self):
+        """Actualiza el reloj del sistema en la GUI"""
+        try:
+            hora_actual = datetime.now().strftime("%H:%M:%S")
+            self.lbl_hora_sistema.config(text=f"🕐 Hora Sistema: {hora_actual}")
+        except Exception:
+            pass
+        # Actualizar cada segundo
+        self.root.after(1000, self._actualizar_reloj_sistema)
     
     def _procesar_logs(self):
         """Procesa la cola de logs y actualiza los widgets de log"""

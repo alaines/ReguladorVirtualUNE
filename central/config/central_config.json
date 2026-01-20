@@ -25,7 +25,59 @@
                 129
             ],
             "polling_intervalo_ms": 5000,
-            "habilitado": true
+            "habilitado": true,
+            "num_grupos": 4
+        },
+        {
+            "id": 2,
+            "nombre": "Av. Arequipa - Jr. Soledad",
+            "tipo_conexion": "tcp",
+            "ip": "192.168.3.48",
+            "puerto": 19000,
+            "puerto_com": "",
+            "baudrate": 9600,
+            "modo": "A",
+            "subreguladores": [
+                128,
+                129
+            ],
+            "polling_intervalo_ms": 5000,
+            "habilitado": true,
+            "num_grupos": 10
+        },
+        {
+            "id": 3,
+            "nombre": "Av. Arequipa - Jr. Emilio Fernandez",
+            "tipo_conexion": "tcp",
+            "ip": "192.168.3.62",
+            "puerto": 19000,
+            "puerto_com": "",
+            "baudrate": 9600,
+            "modo": "A",
+            "subreguladores": [
+                128,
+                129
+            ],
+            "polling_intervalo_ms": 5000,
+            "habilitado": true,
+            "num_grupos": 6
+        },
+        {
+            "id": 4,
+            "nombre": "Av. Arequipa - Jr. Tomas Guido",
+            "tipo_conexion": "tcp",
+            "ip": "192.168.3.50",
+            "puerto": 19000,
+            "puerto_com": "",
+            "baudrate": 9600,
+            "modo": "A",
+            "subreguladores": [
+                128,
+                129
+            ],
+            "polling_intervalo_ms": 5000,
+            "habilitado": true,
+            "num_grupos": 6
         }
     ],
     "gui": {

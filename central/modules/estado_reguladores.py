@@ -28,6 +28,15 @@ class EstadoRepresentacion(Enum):
     COLORES = 2
 
 
+class ModoControl(Enum):
+    """Modo de control del regulador"""
+    DESCONOCIDO = -1
+    LOCAL = 0       # Control desde panel físico
+    ORDENADOR = 1   # Control desde central (remoto)
+    FORZADO = 2     # Modo forzado
+    MANUAL = 3      # Control manual
+
+
 @dataclass
 class EstadoGrupo:
     """Estado de un grupo de semáforos"""
@@ -56,11 +65,20 @@ class Alarmas:
     puerta_abierta: bool = False
     fallo_24v: bool = False
     fallo_rojo: bool = False
+    grupos_con_fallo: List[int] = field(default_factory=list)  # Grupos con fallo de lámpara/salida
+    grupos_averiados: List[Dict] = field(default_factory=list)  # Detalle de averías por grupo
     
     @property
     def tiene_alarmas(self) -> bool:
         return any([self.lampara_fundida, self.conflicto, 
                     self.puerta_abierta, self.fallo_24v, self.fallo_rojo])
+    
+    @property
+    def grupos_fallo_texto(self) -> str:
+        """Retorna texto con grupos afectados"""
+        if self.grupos_con_fallo:
+            return ", ".join([f"G{g}" for g in self.grupos_con_fallo])
+        return ""
     
     def to_dict(self) -> Dict[str, bool]:
         return {
@@ -105,6 +123,7 @@ class EstadoRegulador:
     minuto: int = 0
     segundo: int = 0
     estado_repr: EstadoRepresentacion = EstadoRepresentacion.COLORES
+    modo_control: ModoControl = ModoControl.DESCONOCIDO  # LOCAL/ORDENADOR
     
     # Grupos
     grupos: List[EstadoGrupo] = field(default_factory=list)
@@ -151,6 +170,23 @@ class EstadoRegulador:
         return textos.get(self.estado_repr, 'DESCONOCIDO')
     
     @property
+    def modo_control_texto(self) -> str:
+        """Texto del modo de control para mostrar en GUI"""
+        textos = {
+            ModoControl.DESCONOCIDO: '--',
+            ModoControl.LOCAL: '🏠 LOCAL',
+            ModoControl.ORDENADOR: '💻 ORDENADOR',
+            ModoControl.FORZADO: '⚠️ FORZADO',
+            ModoControl.MANUAL: '🔧 MANUAL'
+        }
+        return textos.get(self.modo_control, '--')
+    
+    @property
+    def es_modo_local(self) -> bool:
+        """Indica si el regulador está en modo LOCAL"""
+        return self.modo_control == ModoControl.LOCAL
+    
+    @property
     def hora_formateada(self) -> str:
         return f"{self.hora:02d}:{self.minuto:02d}:{self.segundo:02d}"
     
@@ -185,6 +221,9 @@ class EstadoRegulador:
         """Actualiza estado de grupos"""
         for g_data in grupos_data:
             num = g_data.get('numero', 0)
+            # Expandir lista si es necesario
+            while len(self.grupos) < num:
+                self.grupos.append(EstadoGrupo(len(self.grupos) + 1))
             if 0 < num <= len(self.grupos):
                 self.grupos[num-1].estado = g_data.get('estado', 0)
         
@@ -211,13 +250,14 @@ class EstadoRegulador:
             'modo': self.modo,
             'subreguladores': self.subreguladores,
             'polling_intervalo_ms': self.polling_intervalo_ms,
-            'habilitado': self.habilitado
+            'habilitado': self.habilitado,
+            'num_grupos': self.num_grupos
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'EstadoRegulador':
         """Crea instancia desde diccionario"""
-        return cls(
+        reg = cls(
             id=data.get('id', 0),
             nombre=data.get('nombre', ''),
             tipo_conexion=data.get('tipo_conexion', 'tcp'),
@@ -230,6 +270,8 @@ class EstadoRegulador:
             polling_intervalo_ms=data.get('polling_intervalo_ms', 5000),
             habilitado=data.get('habilitado', True)
         )
+        reg.num_grupos = data.get('num_grupos', 4)
+        return reg
 
 
 class GestorReguladores:
